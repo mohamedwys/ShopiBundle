@@ -1,6 +1,5 @@
 import isShopAvailable from "@/utils/middleware/isShopAvailable";
-import { Toast, useAppBridge } from "@shopify/app-bridge-react";
-import { Redirect } from "@shopify/app-bridge/actions";
+import { useRouter } from "next/router";
 
 import {
   Badge,
@@ -8,11 +7,14 @@ import {
   Form,
   FormLayout,
   Layout,
-  LegacyCard,
+  Card,
   OptionList,
   Page,
   Spinner,
   TextField,
+  Toast,
+  Frame,
+  BlockStack,
 } from "@shopify/polaris";
 import { useCallback, useEffect, useState } from "react";
 import React from "react";
@@ -39,13 +41,11 @@ export type getAutoBundleata = {
 };
 
 const AutoBundlePage = () => {
-  const app = useAppBridge();
-  const redirect = Redirect.create(app);
+  const router = useRouter();
   const fetch = useFetch();
 
   const [i18n] = useI18n();
 
-  true;
   // Already an auto bundle is active or not
   const [bundleActice, setBundleActice] = useState(false);
 
@@ -64,6 +64,24 @@ const AutoBundlePage = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // success/error toast messages
+  const [successToastActive, setSuccessToastActive] = useState(false);
+  const [errorToastActive, setErrorToastActive] = useState(false);
+  const [deleteSuccessToastActive, setDeleteSuccessToastActive] = useState(false);
+
+  const toggleSuccessToastActive = useCallback(
+    () => setSuccessToastActive((active) => !active),
+    []
+  );
+  const toggleErrorToastActive = useCallback(
+    () => setErrorToastActive((active) => !active),
+    []
+  );
+  const toggleDeleteSuccessToast = useCallback(
+    () => setDeleteSuccessToastActive((active) => !active),
+    []
+  );
 
   // Submit Form: Save auto bundle data Bundle
   async function handleSubmit() {
@@ -88,7 +106,7 @@ const AutoBundlePage = () => {
       body: JSON.stringify(data),
     });
 
-    if (response.status == 200) {
+    if (response.status === 200) {
       toggleSuccessToastActive();
       setBundleActice(true);
     } else {
@@ -110,7 +128,7 @@ const AutoBundlePage = () => {
     await fetch("/api/getAutoBundleData", {
       method: "POST",
     }).then(async (res) => {
-      if (res.status == 200) {
+      if (res.status === 200) {
         setBundleActice(true);
         const data: getAutoBundleata = JSON.parse(await res.json());
         setSelectedCollections(data.collections);
@@ -155,48 +173,6 @@ const AutoBundlePage = () => {
     };
   });
 
-  // success/error toast messages
-  const [successToastActive, setSuccessToastActive] = useState(false);
-  const [errorToastActive, setErrorToastActive] = useState(false);
-  const [deleteSuccessToastActive, setDeleteSuccessToastActive] =
-    useState(false);
-
-  const toggleSuccessToastActive = useCallback(
-    () => setSuccessToastActive((active) => !active),
-    []
-  );
-  const toggleErrorToastActive = useCallback(
-    () => setErrorToastActive((active) => !active),
-    []
-  );
-  const toggleDeleteSuccessToast = useCallback(
-    () => setDeleteSuccessToastActive((active) => !active),
-    []
-  );
-
-  const successToast = successToastActive ? (
-    <Toast
-      content={i18n.translate("auto_bundle.toasts.success")}
-      onDismiss={toggleSuccessToastActive}
-      duration={3000}
-    />
-  ) : null;
-  const errorToast = errorToastActive ? (
-    <Toast
-      content={i18n.translate("auto_bundle.toasts.error")}
-      onDismiss={toggleErrorToastActive}
-      duration={3000}
-      error
-    />
-  ) : null;
-  const deleteSuccessToast = deleteSuccessToastActive ? (
-    <Toast
-      content={i18n.translate("auto_bundle.toasts.delete")}
-      onDismiss={toggleErrorToastActive}
-      duration={3000}
-    />
-  ) : null;
-
   // While getting data show spinner
   if (loading) {
     return (
@@ -214,148 +190,168 @@ const AutoBundlePage = () => {
     );
   }
 
+  const successToast = successToastActive ? (
+    <Toast
+      content={i18n.translate("auto_bundle.toasts.success")}
+      onDismiss={toggleSuccessToastActive}
+      duration={3000}
+    />
+  ) : null;
+  
+  const errorToast = errorToastActive ? (
+    <Toast
+      content={i18n.translate("auto_bundle.toasts.error")}
+      onDismiss={toggleErrorToastActive}
+      duration={3000}
+      error
+    />
+  ) : null;
+  
+  const deleteSuccessToast = deleteSuccessToastActive ? (
+    <Toast
+      content={i18n.translate("auto_bundle.toasts.delete")}
+      onDismiss={toggleDeleteSuccessToast}
+      duration={3000}
+    />
+  ) : null;
+
   return (
-    <Page
-      title={i18n.translate("auto_bundle.title")}
-      backAction={{
-        onAction: () => redirect.dispatch(Redirect.Action.APP, "/"),
-      }}
-    >
-      <Layout>
-        <Layout.Section fullWidth>
-          <Form onSubmit={handleSubmit}>
-            <FormLayout>
-              <LegacyCard sectioned>
-                <LegacyCard.Section>
-                  {i18n.translate("auto_bundle.status.title")}{" "}
-                  {bundleActice ? (
-                    <Badge status="success">
-                      {i18n.translate("auto_bundle.status.active")}
-                    </Badge>
-                  ) : (
-                    <Badge>
-                      {i18n.translate("auto_bundle.status.inactive")}
-                    </Badge>
-                  )}
-                  <p>{i18n.translate("auto_bundle.description")}</p>
-                </LegacyCard.Section>
-                <LegacyCard.Section>
-                  <OptionList
-                    title={i18n.translate("auto_bundle.tags")}
-                    onChange={(value) => setSelectedTags(value)}
-                    options={tagsOptions}
-                    allowMultiple
-                    selected={selectedTags}
-                  />
-                </LegacyCard.Section>
+    <Frame>
+      <Page
+        title={i18n.translate("auto_bundle.title")}
+        backAction={{
+          onAction: () => router.push("/"),
+        }}
+      >
+        <Layout>
+          <Layout.Section>
+            <Form onSubmit={handleSubmit}>
+              <FormLayout>
+                <Card>
+                  <BlockStack gap="400">
+                    <BlockStack gap="200">
+                      {i18n.translate("auto_bundle.status.title")}{" "}
+                      {bundleActice ? (
+                        <Badge tone="success">
+                          {i18n.translate("auto_bundle.status.active")}
+                        </Badge>
+                      ) : (
+                        <Badge>
+                          {i18n.translate("auto_bundle.status.inactive")}
+                        </Badge>
+                      )}
+                      <p>{i18n.translate("auto_bundle.description")}</p>
+                    </BlockStack>
+                    
+                    <OptionList
+                      title={i18n.translate("auto_bundle.tags")}
+                      onChange={(value) => setSelectedTags(value)}
+                      options={tagsOptions}
+                      allowMultiple
+                      selected={selectedTags}
+                    />
 
-                <LegacyCard.Section>
-                  <OptionList
-                    title={i18n.translate("auto_bundle.collections")}
-                    onChange={(value) => setSelectedCollections(value)}
-                    options={collectionsOptions}
-                    allowMultiple
-                    selected={selectedCollections}
-                  />
-                </LegacyCard.Section>
+                    <OptionList
+                      title={i18n.translate("auto_bundle.collections")}
+                      onChange={(value) => setSelectedCollections(value)}
+                      options={collectionsOptions}
+                      allowMultiple
+                      selected={selectedCollections}
+                    />
 
-                <LegacyCard.Section>
-                  <TextField
-                    value={minPrice}
-                    onChange={(value) => {
-                      setMinPrice(value);
-                    }}
-                    label={i18n.translate("auto_bundle.minimum_price.label")}
-                    helpText={i18n.translate(
-                      "auto_bundle.minimum_price.help_text"
-                    )}
-                    type="number"
-                    autoComplete=""
-                    min={0}
-                  />
-                </LegacyCard.Section>
-                <LegacyCard.Section>
-                  <TextField
-                    value={maxPrice}
-                    onChange={(value) => {
-                      setMaxPrice(value);
-                    }}
-                    label={i18n.translate("auto_bundle.maximum_price.label")}
-                    helpText={i18n.translate(
-                      "auto_bundle.maximum_price.help_text"
-                    )}
-                    type="number"
-                    autoComplete=""
-                    min={0}
-                  />
-                </LegacyCard.Section>
-                <LegacyCard.Section>
-                  <TextField
-                    value={discount}
-                    onChange={(value) => {
-                      setDiscount(value);
-                    }}
-                    label={i18n.translate("create_bundle.discount.label")}
-                    helpText={i18n.translate(
-                      "create_bundle.discount.help_text"
-                    )}
-                    type="number"
-                    autoComplete="10"
-                    min={0}
-                    max={100}
-                  />
-                </LegacyCard.Section>
-                <LegacyCard.Section>
-                  <TextField
-                    value={minProducts}
-                    onChange={(value) => {
-                      setMinProducts(value);
-                    }}
-                    label={i18n.translate("auto_bundle.minimum_products.label")}
-                    helpText={i18n.translate(
-                      "auto_bundle.minimum_products.help_text"
-                    )}
-                    type="number"
-                    autoComplete="2"
-                    min={1}
-                    max={20}
-                  />
-                </LegacyCard.Section>
-              </LegacyCard>
-              <div
-                style={{ display: "flex", gap: "1rem", paddingBottom: "1rem" }}
-              >
-                <Button primary submit loading={saving}>
-                  {i18n.translate("buttons.save")}
-                </Button>
-                <Button
-                  loading={deleting}
-                  destructive
-                  disabled={!bundleActice}
-                  onClick={() => {
-                    deleteAutoBundle();
-                    redirect.dispatch(Redirect.Action.APP, "/");
-                  }}
+                    <TextField
+                      value={minPrice}
+                      onChange={(value) => {
+                        setMinPrice(value);
+                      }}
+                      label={i18n.translate("auto_bundle.minimum_price.label")}
+                      helpText={i18n.translate(
+                        "auto_bundle.minimum_price.help_text"
+                      )}
+                      type="number"
+                      autoComplete="off"
+                      min={0}
+                    />
+
+                    <TextField
+                      value={maxPrice}
+                      onChange={(value) => {
+                        setMaxPrice(value);
+                      }}
+                      label={i18n.translate("auto_bundle.maximum_price.label")}
+                      helpText={i18n.translate(
+                        "auto_bundle.maximum_price.help_text"
+                      )}
+                      type="number"
+                      autoComplete="off"
+                      min={0}
+                    />
+
+                    <TextField
+                      value={discount}
+                      onChange={(value) => {
+                        setDiscount(value);
+                      }}
+                      label={i18n.translate("create_bundle.discount.label")}
+                      helpText={i18n.translate(
+                        "create_bundle.discount.help_text"
+                      )}
+                      type="number"
+                      autoComplete="off"
+                      min={0}
+                      max={100}
+                    />
+
+                    <TextField
+                      value={minProducts}
+                      onChange={(value) => {
+                        setMinProducts(value);
+                      }}
+                      label={i18n.translate("auto_bundle.minimum_products.label")}
+                      helpText={i18n.translate(
+                        "auto_bundle.minimum_products.help_text"
+                      )}
+                      type="number"
+                      autoComplete="off"
+                      min={1}
+                      max={20}
+                    />
+                  </BlockStack>
+                </Card>
+                <div
+                  style={{ display: "flex", gap: "1rem", paddingBottom: "1rem" }}
                 >
-                  {i18n.translate("buttons.delete")}
-                </Button>
-                <Button
-                  monochrome
-                  onClick={() => {
-                    redirect.dispatch(Redirect.Action.APP, "/");
-                  }}
-                >
-                  {i18n.translate("buttons.cancel")}
-                </Button>
-              </div>
-            </FormLayout>
-          </Form>
-        </Layout.Section>
-      </Layout>
-      {successToast}
-      {errorToast}
-      {deleteSuccessToast}
-    </Page>
+                  <Button variant="primary" submit loading={saving}>
+                    {i18n.translate("buttons.save")}
+                  </Button>
+                  <Button
+                    loading={deleting}
+                    tone="critical"
+                    disabled={!bundleActice}
+                    onClick={() => {
+                      deleteAutoBundle();
+                      router.push("/");
+                    }}
+                  >
+                    {i18n.translate("buttons.delete")}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      router.push("/");
+                    }}
+                  >
+                    {i18n.translate("buttons.cancel")}
+                  </Button>
+                </div>
+              </FormLayout>
+            </Form>
+          </Layout.Section>
+        </Layout>
+        {successToast}
+        {errorToast}
+        {deleteSuccessToast}
+      </Page>
+    </Frame>
   );
 };
 

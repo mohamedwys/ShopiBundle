@@ -1,6 +1,5 @@
 import isShopAvailable from "@/utils/middleware/isShopAvailable";
-import { ResourcePicker, Toast, useAppBridge } from "@shopify/app-bridge-react";
-import { Redirect } from "@shopify/app-bridge/actions";
+import { useRouter } from "next/router";
 import { Product } from "@shopify/app-bridge/actions/ResourcePicker";
 import SelectedProductsTable from "@/components/SelectedProductsTable";
 
@@ -10,10 +9,13 @@ import {
   Form,
   FormLayout,
   Layout,
-  LegacyCard,
+  Card,
   Page,
   Text,
   TextField,
+  Toast,
+  Frame,
+  BlockStack,
 } from "@shopify/polaris";
 import { useCallback, useState } from "react";
 import React from "react";
@@ -22,8 +24,7 @@ import { BundleData } from "@/utils/shopifyQueries/createBundle";
 import { useI18n } from "@shopify/react-i18n";
 
 const CreateBundlePage = () => {
-  const app = useAppBridge();
-  const redirect = Redirect.create(app);
+  const router = useRouter();
   const fetch = useFetch();
 
   const [i18n] = useI18n();
@@ -39,8 +40,41 @@ const CreateBundlePage = () => {
   );
   const [discount, setDiscount] = useState("10");
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
-  const [resoursePicker, setResoursePicker] = useState(false);
+  const [resourcePicker, setResourcePicker] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // success/error toast messages
+  const [successToastActive, setSuccessToastActive] = useState(false);
+  const [errorToastActive, setErrorToastActive] = useState(false);
+
+  const toggleSuccessToastActive = useCallback(
+    () => setSuccessToastActive((active) => !active),
+    []
+  );
+  const toggleErrorToastActive = useCallback(
+    () => setErrorToastActive((active) => !active),
+    []
+  );
+
+  // Open Shopify product picker
+  const openProductPicker = () => {
+    if (window.shopify) {
+      window.shopify.resourcePicker({
+        type: 'product',
+        multiple: true,
+        action: 'select',
+        filter: {
+          variants: true,
+        },
+      }).then((selection) => {
+        if (selection && selection.length > 0) {
+          setSelectedProducts(selection as Product[]);
+        }
+      }).catch((error) => {
+        console.error('Product picker error:', error);
+      });
+    }
+  };
 
   // Submit Form: Create new Bundle
   async function handleSubmit() {
@@ -59,7 +93,7 @@ const CreateBundlePage = () => {
       method: "POST",
       body: JSON.stringify(data),
     });
-    if (response.status == 200) {
+    if (response.status === 200) {
       setBundleName(
         `${i18n.translate("create_bundle.default_values.bundle_name")}`
       );
@@ -77,18 +111,6 @@ const CreateBundlePage = () => {
     setSelectedProducts([]);
     setLoading(false);
   }
-  // success/error toast messages
-  const [successToastActive, setSuccessToastActive] = useState(false);
-  const [errorToastActive, setErrorToastActive] = useState(false);
-
-  const toggleSuccessToastActive = useCallback(
-    () => setSuccessToastActive((active) => !active),
-    []
-  );
-  const toggleErrorToastActive = useCallback(
-    () => setErrorToastActive((active) => !active),
-    []
-  );
 
   const successToast = successToastActive ? (
     <Toast
@@ -97,6 +119,7 @@ const CreateBundlePage = () => {
       duration={3000}
     />
   ) : null;
+  
   const errorToast = errorToastActive ? (
     <Toast
       content={i18n.translate("create_bundle.toasts.error")}
@@ -107,139 +130,124 @@ const CreateBundlePage = () => {
   ) : null;
 
   return (
-    <Page
-      title="Create Bundle"
-      backAction={{
-        onAction: () => redirect.dispatch(Redirect.Action.APP, "/"),
-      }}
-    >
-      <Layout>
-        <Layout.Section fullWidth>
-          <Form onSubmit={handleSubmit}>
-            <FormLayout>
-              <LegacyCard sectioned>
-                <LegacyCard.Section>
-                  <TextField
-                    value={bundleName}
-                    onChange={(value) => {
-                      setBundleName(value);
-                    }}
-                    label={i18n.translate("create_bundle.bundle_name.label")}
-                    helpText={i18n.translate(
-                      "create_bundle.bundle_name.help_text"
-                    )}
-                    type="text"
-                    autoComplete=""
-                  />
-                </LegacyCard.Section>
+    <Frame>
+      <Page
+        title="Create Bundle"
+        backAction={{
+          onAction: () => router.push("/"),
+        }}
+      >
+        <Layout>
+          <Layout.Section>
+            <Form onSubmit={handleSubmit}>
+              <FormLayout>
+                <Card>
+                  <BlockStack gap="400">
+                    <TextField
+                      value={bundleName}
+                      onChange={(value) => {
+                        setBundleName(value);
+                      }}
+                      label={i18n.translate("create_bundle.bundle_name.label")}
+                      helpText={i18n.translate(
+                        "create_bundle.bundle_name.help_text"
+                      )}
+                      type="text"
+                      autoComplete="off"
+                    />
 
-                <LegacyCard.Section>
-                  <TextField
-                    value={bundleTitle}
-                    onChange={(value) => {
-                      setBundleTitle(value);
-                    }}
-                    label={i18n.translate("create_bundle.bundle_title.label")}
-                    helpText={i18n.translate(
-                      "create_bundle.bundle_title.help_text"
-                    )}
-                    type="text"
-                    autoComplete=""
-                  />
-                </LegacyCard.Section>
+                    <TextField
+                      value={bundleTitle}
+                      onChange={(value) => {
+                        setBundleTitle(value);
+                      }}
+                      label={i18n.translate("create_bundle.bundle_title.label")}
+                      helpText={i18n.translate(
+                        "create_bundle.bundle_title.help_text"
+                      )}
+                      type="text"
+                      autoComplete="off"
+                    />
 
-                <LegacyCard.Section>
-                  <TextField
-                    value={description}
-                    onChange={(value) => {
-                      setDescription(value);
-                    }}
-                    label={i18n.translate("create_bundle.description.label")}
-                    helpText={i18n.translate(
-                      "create_bundle.description.help_text"
-                    )}
-                    type="text"
-                    autoComplete=""
-                  />
-                </LegacyCard.Section>
-                <LegacyCard.Section>
-                  <TextField
-                    value={discount}
-                    onChange={(value) => {
-                      setDiscount(value);
-                    }}
-                    label={i18n.translate("create_bundle.discount.label")}
-                    helpText={i18n.translate(
-                      "create_bundle.discount.help_text"
-                    )}
-                    type="number"
-                    suffix="%"
-                    autoComplete="10"
-                    max={100}
-                    min={0}
-                  />
-                </LegacyCard.Section>
-              </LegacyCard>
+                    <TextField
+                      value={description}
+                      onChange={(value) => {
+                        setDescription(value);
+                      }}
+                      label={i18n.translate("create_bundle.description.label")}
+                      helpText={i18n.translate(
+                        "create_bundle.description.help_text"
+                      )}
+                      type="text"
+                      autoComplete="off"
+                    />
 
-              <LegacyCard
-                title={i18n.translate("create_bundle.products.title")}
-                sectioned
-              >
-                <Text as="p" color="subdued">
-                  {i18n.translate("create_bundle.products.help_text")}
-                </Text>
-                <LegacyCard.Section>
-                  {selectedProducts.length == 0 ? (
-                    <Banner status="warning">
-                      <Text as="p" color="warning">
-                        {i18n.translate("create_bundle.products.warning")}
+                    <TextField
+                      value={discount}
+                      onChange={(value) => {
+                        setDiscount(value);
+                      }}
+                      label={i18n.translate("create_bundle.discount.label")}
+                      helpText={i18n.translate(
+                        "create_bundle.discount.help_text"
+                      )}
+                      type="number"
+                      suffix="%"
+                      autoComplete="off"
+                      max={100}
+                      min={0}
+                    />
+                  </BlockStack>
+                </Card>
+
+                <Card>
+                  <BlockStack gap="400">
+                    <BlockStack gap="200">
+                      <Text as="h2" variant="headingMd">
+                        {i18n.translate("create_bundle.products.title")}
                       </Text>
-                    </Banner>
-                  ) : (
-                    <SelectedProductsTable products={selectedProducts} />
-                  )}
-                </LegacyCard.Section>
-                <Button primary onClick={() => setResoursePicker(true)}>
-                  {i18n.translate("create_bundle.products.select")}
-                </Button>
-              </LegacyCard>
-              <ResourcePicker
-                resourceType="Product"
-                open={resoursePicker}
-                initialSelectionIds={selectedProducts.map((product) => {
-                  return {
-                    id: product.id,
-                    variants: product.variants.map((varient) => {
-                      return { id: varient.id };
-                    }),
-                  };
-                })}
-                onSelection={(payload) => {
-                  setSelectedProducts(payload.selection as Product[]);
-                  setResoursePicker(false);
-                }}
-                onCancel={() => setResoursePicker(false)}
-              />
-              <div
-                style={{ display: "flex", gap: "1rem", paddingBottom: "1rem" }}
-              >
-                <Button
-                  size="large"
-                  primary
-                  submit
-                  disabled={selectedProducts.length == 0}
-                  loading={loading}
+                      <Text as="p" tone="subdued">
+                        {i18n.translate("create_bundle.products.help_text")}
+                      </Text>
+                    </BlockStack>
+
+                    {selectedProducts.length === 0 ? (
+                      <Banner tone="warning">
+                        <Text as="p">
+                          {i18n.translate("create_bundle.products.warning")}
+                        </Text>
+                      </Banner>
+                    ) : (
+                      <SelectedProductsTable products={selectedProducts} />
+                    )}
+
+                    <Button variant="primary" onClick={openProductPicker}>
+                      {i18n.translate("create_bundle.products.select")}
+                    </Button>
+                  </BlockStack>
+                </Card>
+
+                <div
+                  style={{ display: "flex", gap: "1rem", paddingBottom: "1rem" }}
                 >
-                  {i18n.translate("buttons.save_bundle")}
-                </Button>
-              </div>
-            </FormLayout>
-          </Form>
-        </Layout.Section>
-      </Layout>
-      {successToast}
-      {errorToast}
-    </Page>
+                  <Button
+                    size="large"
+                    variant="primary"
+                    submit
+                    disabled={selectedProducts.length === 0}
+                    loading={loading}
+                  >
+                    {i18n.translate("buttons.save_bundle")}
+                  </Button>
+                </div>
+              </FormLayout>
+            </Form>
+          </Layout.Section>
+        </Layout>
+        {successToast}
+        {errorToast}
+      </Page>
+    </Frame>
   );
 };
 

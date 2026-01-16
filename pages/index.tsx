@@ -1,14 +1,12 @@
 import isShopAvailable from "@/utils/middleware/isShopAvailable";
-import { useAppBridge, useLocale } from "@shopify/app-bridge-react";
-import { Redirect } from "@shopify/app-bridge/actions";
-import { Button, Layout, Page } from "@shopify/polaris";
+import { useRouter } from "next/router";
+import { Button, Layout, Page, BlockStack } from "@shopify/polaris";
 import ProductsTable from "@/components/ProductsTable";
 import AnalyticsTable from "@/components/AnalyticsTable";
 import { useI18n } from "@shopify/react-i18n";
 
 const HomePage = () => {
-  const app = useAppBridge();
-  const redirect = Redirect.create(app);
+  const router = useRouter();
   const [i18n] = useI18n();
 
   return (
@@ -17,7 +15,7 @@ const HomePage = () => {
       secondaryActions={
         <Button
           onClick={() => {
-            redirect.dispatch(Redirect.Action.APP, "/auto_bundle");
+            router.push("/auto_bundle");
           }}
         >
           {i18n.translate("buttons.auto_bundle")}
@@ -26,14 +24,16 @@ const HomePage = () => {
       primaryAction={{
         content: `${i18n.translate("buttons.create_bundle")}`,
         onAction: () => {
-          redirect.dispatch(Redirect.Action.APP, "/create_bundle");
+          router.push("/create_bundle");
         },
       }}
     >
       <Layout>
         <Layout.Section>
-          <ProductsTable />
-          <AnalyticsTable />
+          <BlockStack gap="400">
+            <ProductsTable />
+            <AnalyticsTable />
+          </BlockStack>
         </Layout.Section>
       </Layout>
     </Page>
