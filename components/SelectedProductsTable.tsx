@@ -2,7 +2,7 @@ import {
   Product,
   ProductVariant,
 } from "@shopify/app-bridge/actions/ResourcePicker";
-import { IndexTable, LegacyCard, Text } from "@shopify/polaris";
+import { IndexTable, Card, Text } from "@shopify/polaris";
 import React, { ReactElement } from "react";
 import { useI18n } from "@shopify/react-i18n";
 
@@ -33,7 +33,7 @@ function SelectedProductsTable({ products }: Props): ReactElement {
   );
 
   return (
-    <LegacyCard>
+    <Card padding="0">
       <IndexTable
         itemCount={productsArray.length}
         headings={[
@@ -45,7 +45,7 @@ function SelectedProductsTable({ products }: Props): ReactElement {
       >
         {rowMarkup}
       </IndexTable>
-    </LegacyCard>
+    </Card>
   );
 }
 

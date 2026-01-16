@@ -1,16 +1,17 @@
 import {
   IndexTable,
-  LegacyCard,
+  Card,
   useIndexResourceState,
   Text,
   Pagination,
   Button,
+  BlockStack,
+  InlineStack,
 } from "@shopify/polaris";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import useFetch from "./hooks/useFetch";
 import { GetBundlesData } from "@/utils/shopifyQueries/getBundles";
-import { Redirect } from "@shopify/app-bridge/actions";
-import { useAppBridge } from "@shopify/app-bridge-react";
 import { useI18n } from "@shopify/react-i18n";
 
 export type Fieldvalues = {
@@ -25,9 +26,7 @@ export type Fieldvalues = {
 
 export default function ProductsTable() {
   const fetch = useFetch();
-  const app = useAppBridge();
-  const redirect = Redirect.create(app);
-
+  const router = useRouter();
   const [i18n] = useI18n();
 
   const [bundles, setBundles] = useState([]);
@@ -110,6 +109,11 @@ export default function ProductsTable() {
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(bundles);
 
+  // Navigate to edit page using Next.js router
+  const navigateToEdit = (id: string) => {
+    router.push(`/edit_bundle?id=${encodeURIComponent(id)}`);
+  };
+
   // table data
   const rowMarkup = bundles.map(
     ({ id, handle, name, title, created, discount }, index) => (
@@ -129,8 +133,7 @@ export default function ProductsTable() {
             onClick={() => {
               navigator.clipboard.writeText(handle);
             }}
-            plain
-            dataPrimaryLink
+            variant="plain"
           >
             {i18n.translate("index.bundles_table.copy")}
           </Button>
@@ -140,13 +143,8 @@ export default function ProductsTable() {
         <IndexTable.Cell>{title}</IndexTable.Cell>
         <IndexTable.Cell>
           <Button
-            onClick={() => {
-              redirect.dispatch(
-                Redirect.Action.APP,
-                `/edit_bundle?id=${encodeURIComponent(id)}`
-              );
-            }}
-            plain
+            onClick={() => navigateToEdit(id)}
+            variant="plain"
           >
             {i18n.translate("index.bundles_table.view_edit")}
           </Button>
@@ -156,8 +154,8 @@ export default function ProductsTable() {
   );
 
   return (
-    <>
-      <LegacyCard>
+    <BlockStack gap="400">
+      <Card padding="0">
         <IndexTable
           resourceName={resourceName}
           itemCount={bundles.length}
@@ -178,8 +176,8 @@ export default function ProductsTable() {
         >
           {rowMarkup}
         </IndexTable>
-      </LegacyCard>
-      <div style={{ display: "flex", gap: "1rem", marginBlock: "1rem" }}>
+      </Card>
+      <InlineStack gap="400" align="start">
         <Pagination
           hasPrevious={hasPreviousPage}
           onPrevious={() => {
@@ -190,12 +188,12 @@ export default function ProductsTable() {
             getBunldes(true, endCursor);
           }}
         />
-        {selectedResources.length > 0 ? (
-          <Button onClick={() => deleteBundle()} destructive loading={deleting}>
+        {selectedResources.length > 0 && (
+          <Button onClick={() => deleteBundle()} tone="critical" loading={deleting}>
             {i18n.translate("buttons.delete")}
           </Button>
-        ) : null}
-      </div>
-    </>
+        )}
+      </InlineStack>
+    </BlockStack>
   );
 }
