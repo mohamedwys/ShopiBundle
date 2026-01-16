@@ -1,5 +1,5 @@
 import useFetch from "@/components/hooks/useFetch";
-import { DataTable, LegacyCard, Page } from "@shopify/polaris";
+import { DataTable, Card, Page, BlockStack, Text } from "@shopify/polaris";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
@@ -31,29 +31,35 @@ const ActiveWebhooks = () => {
   }, []);
 
   return (
-    <>
-      <Page
-        title="Webhooks"
-        backAction={{ content: "Home", onAction: () => router.push("/debug") }}
-      >
-        <LegacyCard>
+    <Page
+      title="Webhooks"
+      backAction={{ content: "Home", onAction: () => router.push("/debug") }}
+    >
+      <BlockStack gap="400">
+        <Card padding="0">
           <DataTable
             columnContentTypes={["text", "text"]}
             headings={["Topic", "Callback Url"]}
             rows={rows}
           />
-        </LegacyCard>
-        <LegacyCard title="Webhook URLs" sectioned>
-          <p>
-            Webhooks are registered when the app is installed, or when tokens
-            are refetched by going through the authentication process. If your
-            Callback URL isn't the same as your current URL (happens usually
-            during dev when using ngrok), you need to go through the auth
-            process again.
-          </p>
-        </LegacyCard>
-      </Page>
-    </>
+        </Card>
+
+        <Card>
+          <BlockStack gap="200">
+            <Text as="h2" variant="headingMd">
+              Webhook URLs
+            </Text>
+            <Text as="p">
+              Webhooks are registered when the app is installed, or when tokens
+              are refetched by going through the authentication process. If your
+              Callback URL isn't the same as your current URL (happens usually
+              during dev when using ngrok), you need to go through the auth
+              process again.
+            </Text>
+          </BlockStack>
+        </Card>
+      </BlockStack>
+    </Page>
   );
 };
 

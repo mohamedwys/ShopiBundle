@@ -1,16 +1,12 @@
 import useFetch from "@/components/hooks/useFetch";
-import { useAppBridge } from "@shopify/app-bridge-react";
-import { Redirect } from "@shopify/app-bridge/actions";
-import { DataTable, Layout, LegacyCard, Page } from "@shopify/polaris";
+import { DataTable, Layout, Card, Page, BlockStack, Text } from "@shopify/polaris";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
 const BillingAPI = () => {
   const router = useRouter();
   const [responseData, setResponseData] = useState("");
-  const app = useAppBridge();
   const fetch = useFetch();
-  const redirect = Redirect.create(app);
 
   async function fetchContent() {
     setResponseData("loading...");
@@ -21,7 +17,8 @@ const BillingAPI = () => {
     } else if (data.confirmationUrl) {
       setResponseData("Redirecting");
       const { confirmationUrl } = data;
-      redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+      // Use window.open or window.location for external redirect
+      window.open(confirmationUrl, '_top');
     }
   }
 
@@ -32,25 +29,34 @@ const BillingAPI = () => {
     >
       <Layout>
         <Layout.Section>
-          <LegacyCard
-            sectioned
-            primaryFooterAction={{
-              content: "Subscribe merchant",
-              onAction: () => {
-                fetchContent();
-              },
-            }}
-          >
-            <p>
-              Subscribe your merchant to a test $10.25 plan and redirect to your
-              home page.
-            </p>
+          <Card>
+            <BlockStack gap="400">
+              <Text as="p">
+                Subscribe your merchant to a test $10.25 plan and redirect to your
+                home page.
+              </Text>
 
-            {
-              /* If we have an error, it'll pop up here. */
-              responseData && <p>{responseData}</p>
-            }
-          </LegacyCard>
+              {responseData && <Text as="p">{responseData}</Text>}
+
+              <div>
+                <button
+                  onClick={() => {
+                    fetchContent();
+                  }}
+                  style={{
+                    padding: "8px 16px",
+                    backgroundColor: "#008060",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Subscribe merchant
+                </button>
+              </div>
+            </BlockStack>
+          </Card>
         </Layout.Section>
         <Layout.Section>
           <ActiveSubscriptions />
@@ -86,18 +92,26 @@ const ActiveSubscriptions = () => {
     }
     setRows(rowsData);
   }
+  
   useEffect(() => {
     getActiveSubscriptions();
   }, []);
 
   return (
-    <LegacyCard title="Active Subscriptions" sectioned>
-      <DataTable
-        columnContentTypes={["text", "text", "text", "text"]}
-        headings={["Plan Name", "Status", "Test", "Amount"]}
-        rows={rows}
-      />
-    </LegacyCard>
+    <Card>
+      <BlockStack gap="400">
+        <div style={{ padding: "1rem 1rem 0" }}>
+          <Text as="h2" variant="headingMd">
+            Active Subscriptions
+          </Text>
+        </div>
+        <DataTable
+          columnContentTypes={["text", "text", "text", "text"]}
+          headings={["Plan Name", "Status", "Test", "Amount"]}
+          rows={rows}
+        />
+      </BlockStack>
+    </Card>
   );
 };
 
