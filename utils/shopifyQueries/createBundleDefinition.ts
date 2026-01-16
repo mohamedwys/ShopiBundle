@@ -1,5 +1,4 @@
-import { GraphqlClient } from "@shopify/shopify-api/lib/clients/graphql/graphql_client";
-
+import { GraphqlClient } from "@shopify/shopify-api";
 export interface BundleDefinitionQuery {
   data: {
     metaobjectDefinitionCreate: {

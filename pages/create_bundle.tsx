@@ -57,22 +57,24 @@ const CreateBundlePage = () => {
   );
 
   // Open Shopify product picker
-  const openProductPicker = () => {
+  const openProductPicker = async () => {
     if (window.shopify) {
-      window.shopify.resourcePicker({
-        type: 'product',
-        multiple: true,
-        action: 'select',
-        filter: {
-          variants: true,
-        },
-      }).then((selection) => {
+      try {
+        const selection = await (window.shopify.resourcePicker({
+          type: 'product',
+          multiple: true,
+          action: 'select',
+          filter: {
+            variants: true,
+          },
+        }) as Promise<Product[]>);
+        
         if (selection && selection.length > 0) {
-          setSelectedProducts(selection as Product[]);
+          setSelectedProducts(selection);
         }
-      }).catch((error) => {
+      } catch (error) {
         console.error('Product picker error:', error);
-      });
+      }
     }
   };
 

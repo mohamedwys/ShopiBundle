@@ -1,4 +1,4 @@
-import { GraphqlClient } from "@shopify/shopify-api/lib/clients/graphql/graphql_client";
+import { GraphqlClient } from "@shopify/shopify-api";
 
 export async function discountDelete(client: GraphqlClient, ids: string[]) {
   await client.query({
