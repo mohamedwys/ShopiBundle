@@ -1,5 +1,6 @@
 import { AppProvider as PolarisProvider } from "@shopify/polaris";
 import "@shopify/polaris/build/esm/styles.css";
+import Head from "next/head";
 import AppBridgeProvider from "@/components/providers/AppBridgeProvider";
 import { I18nContext, I18nManager, useI18n } from "@shopify/react-i18n";
 import en from "@/translations/en.json";
@@ -41,10 +42,19 @@ export default function App({ Component, pageProps }) {
   });
 
   return (
-    <I18nContext.Provider value={i18nManager}>
-      <Providers>
-        <Component {...pageProps} />
-      </Providers>
-    </I18nContext.Provider>
+    <>
+      <Head>
+        {/* App Bridge 4.x Script - loads globally */}
+        <script
+          src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
+          data-api-key={process.env.NEXT_PUBLIC_SHOPIFY_API_KEY}
+        />
+      </Head>
+      <I18nContext.Provider value={i18nManager}>
+        <Providers>
+          <Component {...pageProps} />
+        </Providers>
+      </I18nContext.Provider>
+    </>
   );
 }

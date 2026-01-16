@@ -1,13 +1,27 @@
-import { useAppBridge } from "@shopify/app-bridge-react";
-import { authenticatedFetch } from "@shopify/app-bridge/utilities";
-import { Redirect } from "@shopify/app-bridge/actions";
-
 function useFetch() {
-  const app = useAppBridge();
-  const fetchFunction = authenticatedFetch(app);
-
   return async (uri: RequestInfo, options?: RequestInit) => {
-    const response = await fetchFunction(uri, options);
+    // Get session token from the shopify app bridge
+    let token = "";
+    
+    if (window?.shopify?.idToken) {
+      try {
+        // In App Bridge 4.x, the token is available directly
+        token = await window.shopify.idToken();
+      } catch (error) {
+        console.error("Error getting session token:", error);
+      }
+    }
+
+    const headers = {
+      ...options?.headers,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+
+    const response = await fetch(uri, {
+      ...options,
+      headers,
+    });
 
     if (
       response.headers.get("X-Shopify-API-Request-Failure-Reauthorize") === "1"
@@ -16,8 +30,16 @@ function useFetch() {
         "X-Shopify-API-Request-Failure-Reauthorize-Url"
       );
 
-      const redirect = Redirect.create(app);
-      redirect.dispatch(Redirect.Action.APP, authUrlHeader || `/exitframe`);
+      // Use window.location for reauthorization redirect
+      const redirectUrl = authUrlHeader || `/exitframe`;
+      
+      // For embedded apps, use top-level redirect
+      if (window.top) {
+        window.top.location.href = redirectUrl;
+      } else {
+        window.location.href = redirectUrl;
+      }
+      
       return null;
     }
 

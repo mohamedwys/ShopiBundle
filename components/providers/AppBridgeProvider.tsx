@@ -1,57 +1,48 @@
-import { Provider } from "@shopify/app-bridge-react";
-import { Layout, Page, Spinner } from "@shopify/polaris";
+import { Layout, Page, Spinner, BlockStack } from "@shopify/polaris";
 import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 function AppBridgeProvider({ children }) {
   const router = useRouter();
-  const location = router.asPath;
-
-  const [appBridgeConfig, setConfig] = useState(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const host = router.query?.host;
+    const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY;
 
-    if (host) {
-      setConfig({
-        host: host,
-        apiKey: process.env.CONFIG_SHOPIFY_API_KEY,
-        forceRedirect: true,
-      });
+    if (host && apiKey) {
+      // Initialize shopify global with the app bridge
+      if (window.shopify) {
+        setIsReady(true);
+      } else {
+        // Wait for the script to load
+        const checkShopify = setInterval(() => {
+          if (window.shopify) {
+            clearInterval(checkShopify);
+            setIsReady(true);
+          }
+        }, 100);
+
+        return () => clearInterval(checkShopify);
+      }
     }
   }, [router.query]);
 
-  const history = useMemo(
-    () => ({
-      replace: (path) => {
-        router.push(path);
-      },
-    }),
-    [location]
-  );
-
-  const routerConfig = useMemo(
-    () => ({ history, location }),
-    [history, location]
-  );
-
-  if (!appBridgeConfig) {
+  if (!isReady) {
     return (
       <Page>
         <Layout>
           <Layout.Section>
-            <Spinner />
+            <BlockStack align="center">
+              <Spinner size="large" />
+            </BlockStack>
           </Layout.Section>
         </Layout>
       </Page>
     );
   }
 
-  return (
-    <Provider config={appBridgeConfig} router={routerConfig}>
-      {children}
-    </Provider>
-  );
+  return <>{children}</>;
 }
 
 export default AppBridgeProvider;
