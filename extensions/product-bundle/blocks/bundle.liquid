@@ -1,0 +1,73 @@
+{% assign type = 'product-bundles' %}
+{% assign bundle = shop.metaobjects[type][block.settings.shortcode] %}
+{% assign price = 0 %}
+
+{% if bundle %}
+  <div class="bundle">
+    <p class="bundle-title">{{ bundle.bundle_title }}</p>
+    <p class="bundle-description">{{ bundle.description }}</p>
+    <p class="discounted-price">{{ bundle.discount }}% {{ 'discount' | t }}</p>
+
+    <div class="products">
+      {% for product in bundle.products.value %}
+        <div class="product">
+          <a href="{{ product.url }}">
+            <img
+              class="product-image"
+              src="{{ product.featured_image | image_url: width: 200, height: 200 }}"
+              alt="{{ product.featured_image.alt }}"
+              loading="lazy"
+              height="200"
+              width="200"
+            >
+          </a>
+          <a class="product-name" href="{{ product.url }}">
+            <p>{{ product.title }}</p>
+          </a>
+          <p class="product-price">{{ product.price | money }}</p>
+          {% assign price = price | plus: product.price %}
+        </div>
+      {% endfor %}
+    </div>
+
+    {% assign discountedPrice = price
+      | divided_by: 100
+      | times: bundle.discount
+    %}
+
+    <div class="add-to-cart-button">
+      <p class="discounted-price">
+        <span class="original-price">{{ price | money }}</span>
+        {{ price | minus: discountedPrice | money }}
+        {{ 'only' | t }}
+      </p>
+      <form action="/cart/add" method="post">
+        {% for product in bundle.products.value %}
+          <input
+            type="hidden"
+            name="id[]"
+            value="{{ product.variants.first.id }}"
+          >
+        {% endfor %}
+        <button type="submit">{{ 'action' | t }}</button>
+      </form>
+    </div>
+  </div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Product Bundle",
+  "target": "section",
+  "stylesheet": "style.css",
+  "templates": ["index"],
+  "settings": [
+    {
+      "type": "text",
+      "id": "shortcode",
+      "label": "t:label",
+      "info": "t:info"
+    }
+  ]
+}
+{% endschema %}

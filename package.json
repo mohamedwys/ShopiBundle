@@ -1,0 +1,66 @@
+{
+  "name": "shopify-nextjs-prisma-app",
+  "version": "0.0.1",
+  "type": "module",
+  "author": {
+    "name": "Harshdeep Singh Hura",
+    "url": "https://harshdeephura.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kinngh/shopify-nextjs-prisma-app.git"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "pretty": "prettier --write ./",
+    "update": "ncu -u",
+    "update:url": "node _developer/updateDashboard.js",
+    "ngrok:auth": "ngrok authtoken <auth-token-goes-here>",
+    "ngrok": "ngrok http 3000",
+    "-----> Shopify <-----": "",
+    "shopify": "shopify",
+    "s:e:create": "shopify app generate extension",
+    "s:e:deploy": "shopify app deploy",
+    "-----> Database <-----": "",
+    "pg:create": "mkdir database; pg_ctl -D database init",
+    "pg:start": "pg_ctl -D database start",
+    "pg:stop": "pg_ctl -D database stop",
+    "-----> Prisma <-----": "",
+    "prisma": "npx prisma",
+    "prisma:push": "npx prisma db push",
+    "prisma:pull": "npx prisma db pull",
+    "-----> Reserved Scripts <-----": "",
+    "prepare": "npx prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.1",
+    "@shopify/app-bridge": "^3.7.10",
+    "@shopify/app-bridge-react": "^4.1.5",
+    "@shopify/polaris": "^13.9.0",
+    "@shopify/react-form": "^2.7.3",
+    "@shopify/react-i18n": "^7.13.1",
+    "@shopify/shopify-api": "^11.4.1",
+    "cryptr": "^6.3.0",
+    "graphql": "^16.9.0",
+    "next": "14.2.13",
+    "next-api-middleware": "^3.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@shopify/app": "^3.51.2",
+    "@shopify/cli": "^3.67.0",
+    "@shopify/cli-kit": "^3.67.0",
+    "@types/node": "^22.5.5",
+    "@types/react": "^18.3.8",
+    "dotenv": "^16.4.5",
+    "ngrok": "^5.0.0-beta.2",
+    "npm-check-updates": "^17.1.2",
+    "prettier": "^3.3.3",
+    "prisma": "^5.19.1",
+    "typescript": "^5.6.2"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}
