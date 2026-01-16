@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import useFetch from "./hooks/useFetch";
-import { DataTable, LegacyCard, Spinner } from "@shopify/polaris";
+import { DataTable, Card, Spinner, BlockStack, Text } from "@shopify/polaris";
 import { useI18n } from "@shopify/react-i18n";
 
 export default function AnalyticsTable() {
@@ -41,35 +41,37 @@ export default function AnalyticsTable() {
   // when getting data showing spinner
   if (gettingData) {
     return (
-      <>
-        <div
-          style={{
-            height: "100px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Spinner accessibilityLabel="Spinner example" size="large" />
-        </div>
-      </>
+      <div
+        style={{
+          height: "100px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Spinner accessibilityLabel="Spinner example" size="large" />
+      </div>
     );
   }
 
   // if there is no data after loading then return none
-  if (rows.length == 0) {
-    return <></>;
+  if (rows.length === 0) {
+    return null;
   }
 
   return (
-    <>
-      <LegacyCard
-        title={i18n.translate("index.analytics.total_sales")}
-        sectioned
-      >
-        <h1>{totalSales}</h1>
-      </LegacyCard>
-      <LegacyCard>
+    <BlockStack gap="400">
+      <Card>
+        <BlockStack gap="200">
+          <Text as="h2" variant="headingMd">
+            {i18n.translate("index.analytics.total_sales")}
+          </Text>
+          <Text as="h1" variant="heading2xl">
+            {totalSales}
+          </Text>
+        </BlockStack>
+      </Card>
+      <Card padding="0">
         <DataTable
           columnContentTypes={["text", "text", "text", "numeric"]}
           headings={[
@@ -80,7 +82,7 @@ export default function AnalyticsTable() {
           ]}
           rows={rows}
         />
-      </LegacyCard>
-    </>
+      </Card>
+    </BlockStack>
   );
 }
