@@ -72,7 +72,8 @@ function AppBridgeProvider({ children }) {
   }, [router.isReady, router.query]);
 
   // Special handling for missing_host error
-  if (error === 'missing_host' && shop) {
+  // Only show error if we CURRENTLY don't have host parameter
+  if (error === 'missing_host' && shop && !router.query?.host) {
     const handleReauth = () => {
       sessionStorage.clear();
       const authUrl = `/api?shop=${shop}`;  // Fixed: /api not /api/auth
@@ -139,8 +140,9 @@ function AppBridgeProvider({ children }) {
     );
   }
 
-  // Handle other errors
-  if (error) {
+  // Handle other errors - but only if we don't have valid parameters
+  // This prevents showing stale error state when parameters become available
+  if (error && !(router.query?.host && router.query?.shop)) {
     return (
       <Page>
         <Layout>
