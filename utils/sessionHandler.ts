@@ -1,43 +1,124 @@
-import { Session } from "@shopify/shopify-api";
-import cryption from "./cryption";
-import prisma from "./prisma";
+import { Session } from '@shopify/shopify-api';
+import prisma from './prisma';
 
-const storeSession = async (session) => {
-  await prisma.session.upsert({
-    where: { id: session.id },
-    update: {
-      content: cryption.encrypt(JSON.stringify(session)),
-      shop: session.shop,
-    },
-    create: {
-      id: session.id,
-      content: cryption.encrypt(JSON.stringify(session)),
-      shop: session.shop,
-    },
-  });
+interface SessionData {
+  id: string;
+  shop: string;
+  state: string;
+  isOnline: boolean;
+  accessToken?: string;
+  scope?: string;
+  expires?: Date | null;
+}
 
-  return true;
-};
+const sessionHandler = {
+  async storeSession(session: Session): Promise<void> {
+    try {
+      await prisma.session.upsert({
+        where: { id: session.id },
+        update: {
+          shop: session.shop,
+          state: session.state,
+          isOnline: session.isOnline,
+          accessToken: session.accessToken || null,
+          scope: session.scope || null,
+          expires: session.expires ? new Date(session.expires) : null,
+          updatedAt: new Date(),
+        },
+        create: {
+          id: session.id,
+          shop: session.shop,
+          state: session.state,
+          isOnline: session.isOnline,
+          accessToken: session.accessToken || null,
+          scope: session.scope || null,
+          expires: session.expires ? new Date(session.expires) : null,
+        },
+      });
+      
+      console.log('Session stored successfully:', session.id);
+    } catch (error) {
+      console.error('Error storing session:', error);
+      throw error;
+    }
+  },
 
-const loadSession = async (id) => {
-  const sessionResult = await prisma.session.findUnique({ where: { id } });
+  async loadSession(id: string): Promise<Session | undefined> {
+    try {
+      const sessionData = await prisma.session.findUnique({
+        where: { id }
+      });
+      
+      if (!sessionData) {
+        console.log('No session found for id:', id);
+        return undefined;
+      }
+      
+      return new Session({
+        id: sessionData.id,
+        shop: sessionData.shop,
+        state: sessionData.state,
+        isOnline: sessionData.isOnline,
+        accessToken: sessionData.accessToken || undefined,
+        scope: sessionData.scope || undefined,
+        expires: sessionData.expires || undefined,
+      });
+    } catch (error) {
+      console.error('Error loading session:', error);
+      return undefined;
+    }
+  },
 
-  if (sessionResult === null) {
-    return undefined;
+  async deleteSession(id: string): Promise<boolean> {
+    try {
+      await prisma.session.delete({
+        where: { id }
+      });
+      console.log('Session deleted:', id);
+      return true;
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      return false;
+    }
+  },
+
+  async deleteSessions(ids: string[]): Promise<boolean> {
+    try {
+      await prisma.session.deleteMany({
+        where: {
+          id: {
+            in: ids
+          }
+        }
+      });
+      console.log('Sessions deleted:', ids.length);
+      return true;
+    } catch (error) {
+      console.error('Error deleting sessions:', error);
+      return false;
+    }
+  },
+
+  async findSessionsByShop(shop: string): Promise<Session[]> {
+    try {
+      const sessions = await prisma.session.findMany({
+        where: { shop }
+      });
+
+      return sessions.map(sessionData => new Session({
+        id: sessionData.id,
+        shop: sessionData.shop,
+        state: sessionData.state,
+        isOnline: sessionData.isOnline,
+        accessToken: sessionData.accessToken || undefined,
+        scope: sessionData.scope || undefined,
+        expires: sessionData.expires || undefined,
+      }));
+    } catch (error) {
+      console.error('Error finding sessions by shop:', error);
+      return [];
+    }
   }
-  if (sessionResult.content.length > 0) {
-    const sessionObj = JSON.parse(cryption.decrypt(sessionResult.content));
-    return new Session(sessionObj);
-  }
-  return undefined;
 };
-
-const deleteSession = async (id) => {
-  await prisma.session.deleteMany({ where: { id } });
-
-  return true;
-};
-
-const sessionHandler = { storeSession, loadSession, deleteSession };
 
 export default sessionHandler;
