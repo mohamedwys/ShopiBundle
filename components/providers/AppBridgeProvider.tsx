@@ -27,23 +27,24 @@ function AppBridgeProvider({ children }) {
       return;
     }
 
+    // If we have both host and shop, clear any previous errors and proceed
+    if (host && shop) {
+      setError(null);
+      setShop(null);
+    }
     // If no host parameter but we have shop, show error (don't auto-redirect to avoid loops)
-    if (!host && shop) {
+    else if (!host && shop) {
       console.error('Missing host parameter - app must be accessed through Shopify admin');
       setShop(shop);
       setError('missing_host');
       return;
     }
-
-    // If neither host nor shop, show error
-    if (!host && !shop) {
-      setError('Missing required query parameters. Please access this app through Shopify admin.');
+    // If neither host nor shop after router is ready, it might still be loading
+    // Wait a bit before showing error
+    else if (!host && !shop) {
+      // Don't immediately show error - parameters might still be loading
+      console.log('Waiting for query parameters to load...');
       return;
-    }
-
-    // Clear any stored shop value on successful load
-    if (host && shop) {
-      setShop(null);
     }
 
     // Initialize shopify global with the app bridge
