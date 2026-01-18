@@ -125,7 +125,38 @@ vercel --prod
 
 ---
 
+## Latest Updates (2026-01-18)
+
+### Infinite Redirect Loop Fix
+
+**Issue**: After deploying the initial fix, an infinite redirect loop occurred when the `host` parameter was missing.
+
+**Root Cause**: AppBridgeProvider was checking query parameters before Next.js router was fully hydrated, causing premature redirects.
+
+**Solution Applied**:
+1. Wait for `router.isReady` before processing query parameters
+2. Add sessionStorage counter to limit redirect attempts to 2
+3. Redirect to Shopify admin URL (which reloads with proper parameters)
+4. Show helpful error message after failed attempts
+
+**Debug Page**: Access `/debug` to see diagnostic information about query parameters, environment variables, and app state.
+
+---
+
 ## Troubleshooting
+
+### Seeing "Missing host parameter, redirecting to auth" repeatedly?
+
+This indicates an infinite redirect loop. The latest fix (commit ee6500f) resolves this by:
+- Waiting for Next.js router to be fully ready
+- Limiting redirect attempts to 2 using sessionStorage
+- Breaking the loop and showing an error message after failed attempts
+
+**If you're still seeing this**:
+1. Clear browser cache and all site data for your app URL
+2. Clear sessionStorage: Open browser console and run `sessionStorage.clear()`
+3. Access the app ONLY through: Shopify Admin → Apps → ShopiBundle
+4. DO NOT use bookmarked URLs or direct access
 
 ### Still seeing infinite loading?
 
@@ -166,6 +197,24 @@ This means the app is being accessed directly without going through Shopify's ap
 **Solution**: Always access the app through:
 - Shopify Admin → Apps → ShopiBundle
 - Or: `https://[shop].myshopify.com/admin/apps/[app-id]`
+
+### Using the Debug Page
+
+Access the debug page at: `https://shopi-bundle.vercel.app/debug`
+
+The debug page shows:
+- Query parameters (host, shop, embedded)
+- Environment variable status
+- Router ready state
+- iframe detection
+- App Bridge load status
+- Redirect attempt count
+- Full URL and referrer information
+
+**Troubleshooting Actions Available**:
+- Restart OAuth Flow - Begins a fresh authentication
+- Clear Browser Storage - Removes cached data
+- Reload Page - Forces a refresh
 
 ### Error: "App Bridge failed to load"
 
