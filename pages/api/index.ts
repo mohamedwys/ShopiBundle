@@ -28,22 +28,14 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     console.log('Starting OAuth for shop:', shop);
 
-    // CRITICAL: Generate and store state parameter manually
-    const state = shopify.utils.generateLocalHmac({
-      secret: process.env.SHOPIFY_API_SECRET!,
-      data: `${shop}-${Date.now()}`,
-    });
-
-    // Build OAuth URL manually to control state
-    const authRoute = await shopify.auth.begin({
+    // Start OAuth - shopify.auth.begin handles state automatically
+    await shopify.auth.begin({
       shop: shopify.utils.sanitizeShop(shop),
       callbackPath: '/api/auth/tokens',
       isOnline: false,
       rawRequest: req,
       rawResponse: res,
     });
-
-    console.log('OAuth initiated for:', shop);
 
   } catch (e) {
     console.error(`---> Error at /api/index`, e);
@@ -61,6 +53,8 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
         await prisma.session.deleteMany({
           where: { shop },
         });
+
+        console.log('Cleared sessions for shop:', shop);
       } catch (dbError) {
         console.error('Error clearing sessions:', dbError);
       }
