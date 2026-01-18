@@ -11,8 +11,11 @@ datasource db {
 }
 
 model active_stores {
-  shop     String   @id
-  isActive Boolean? @default(false)
+  shop        String    @id
+  isActive    Boolean?  @default(false)
+  setupError  String?
+  lastError   String?
+  lastErrorAt DateTime?
 }
 
 model session {

@@ -13,25 +13,38 @@ export default function AnalyticsTable() {
 
   async function getData() {
     setGettingData(true);
-    let data = await fetch("/api/getAnalyticsData", {
-      method: "POST",
-    }).then(async (res) => JSON.parse(await res.json()));
+    try {
+      const response = await fetch("/api/getAnalyticsData", {
+        method: "POST",
+      });
 
-    let sales = 0;
-    setRows(
-      data.map((bundleData) => {
-        sales += bundleData.sales;
-        return [
-          bundleData.bundleName,
-          new Date(bundleData.createdAt).toDateString(),
-          bundleData.summary,
-          bundleData.sales,
-        ];
-      })
-    );
-    setTotalSales(sales);
+      // Check if fetch returned null (reauthorization needed)
+      if (!response) {
+        console.log('Fetch returned null, redirecting to auth');
+        setGettingData(false);
+        return;
+      }
 
-    setGettingData(false);
+      let data = JSON.parse(await response.json());
+
+      let sales = 0;
+      setRows(
+        data.map((bundleData) => {
+          sales += bundleData.sales;
+          return [
+            bundleData.bundleName,
+            new Date(bundleData.createdAt).toDateString(),
+            bundleData.summary,
+            bundleData.sales,
+          ];
+        })
+      );
+      setTotalSales(sales);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    } finally {
+      setGettingData(false);
+    }
   }
 
   useEffect(() => {

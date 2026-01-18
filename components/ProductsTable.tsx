@@ -68,32 +68,46 @@ export default function ProductsTable() {
   // get all bundles data
   async function getBunldes(after: boolean, cursor: string = null) {
     setgettingBundles(true);
-    let data: GetBundlesData = await fetch("/api/getBundles", {
-      method: "POST",
-      body: JSON.stringify({
-        after: after,
-        cursor: cursor,
-      }),
-    }).then(async (res) => JSON.parse(await res.json()));
+    try {
+      const response = await fetch("/api/getBundles", {
+        method: "POST",
+        body: JSON.stringify({
+          after: after,
+          cursor: cursor,
+        }),
+      });
 
-    let bundles = data.edges.map(({ node }) => {
-      let values = arrayToObject(node.fields);
-      return {
-        id: node.id,
-        handle: node.handle,
-        name: values.bundle_name,
-        title: values.bundle_title,
-        created: new Date(values.created_at).toDateString(),
-        discount: values.discount,
-      };
-    });
+      // Check if fetch returned null (reauthorization needed)
+      if (!response) {
+        console.log('Fetch returned null, redirecting to auth');
+        setgettingBundles(false);
+        return;
+      }
 
-    setBundles(bundles);
-    setStartCursor(data.pageInfo.startCursor);
-    setEndCursor(data.pageInfo.endCursor);
-    setHasNextPage(data.pageInfo.hasNextPage);
-    setHasPreviousPage(data.pageInfo.hasPreviousPage);
-    setgettingBundles(false);
+      let data: GetBundlesData = JSON.parse(await response.json());
+
+      let bundles = data.edges.map(({ node }) => {
+        let values = arrayToObject(node.fields);
+        return {
+          id: node.id,
+          handle: node.handle,
+          name: values.bundle_name,
+          title: values.bundle_title,
+          created: new Date(values.created_at).toDateString(),
+          discount: values.discount,
+        };
+      });
+
+      setBundles(bundles);
+      setStartCursor(data.pageInfo.startCursor);
+      setEndCursor(data.pageInfo.endCursor);
+      setHasNextPage(data.pageInfo.hasNextPage);
+      setHasPreviousPage(data.pageInfo.hasPreviousPage);
+    } catch (error) {
+      console.error('Error fetching bundles:', error);
+    } finally {
+      setgettingBundles(false);
+    }
   }
 
   // initially get all bundles
