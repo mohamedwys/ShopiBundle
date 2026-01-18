@@ -14,7 +14,7 @@ const isShopAvailable = async (context) => {
         // Use relative URL instead of full URL to avoid issues with env var
         return {
           redirect: {
-            destination: `/api/auth?shop=${shop}`,
+            destination: `/api?shop=${shop}`,  // Fixed: /api not /api/auth
             permanent: false,
           },
         };
@@ -31,7 +31,7 @@ const isShopAvailable = async (context) => {
       // If database check fails, redirect to auth
       return {
         redirect: {
-          destination: `/api/auth?shop=${shop}`,
+          destination: `/api?shop=${shop}`,  // Fixed: /api not /api/auth
           permanent: false,
         },
       };

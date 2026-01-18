@@ -14,7 +14,7 @@ const ExitFrame = () => {
     const redirect = Redirect.create(app);
     redirect.dispatch(
       Redirect.Action.REMOTE,
-      `${process.env.CONFIG_SHOPIFY_APP_URL}/api/auth?shop=${shop}`
+      `${process.env.CONFIG_SHOPIFY_APP_URL}/api?shop=${shop}`  // Fixed: /api not /api/auth
     );
   }, []);
 

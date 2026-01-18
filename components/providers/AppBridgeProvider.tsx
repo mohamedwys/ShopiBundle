@@ -75,7 +75,7 @@ function AppBridgeProvider({ children }) {
   if (error === 'missing_host' && shop) {
     const handleReauth = () => {
       sessionStorage.clear();
-      const authUrl = `/api/auth?shop=${shop}`;
+      const authUrl = `/api?shop=${shop}`;  // Fixed: /api not /api/auth
       if (window !== window.top) {
         window.top.location.href = authUrl;
       } else {
