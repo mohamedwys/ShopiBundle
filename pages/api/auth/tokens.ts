@@ -2,122 +2,97 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from "@/utils/prisma";
 import sessionHandler from "@/utils/sessionHandler";
 import shopify from "@/utils/shopify";
-import {
-  CookieNotFound,
-  InvalidOAuthError,
-  InvalidSession,
-} from "@shopify/shopify-api";
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
-    console.log('Token callback received for shop:', req.query.shop);
+    const { shop, code, state, host } = req.query;
 
-    // Exchange code for OFFLINE access token
-    const callbackResponse = await shopify.auth.callback({
-      rawRequest: req,
-      rawResponse: res,
+    console.log('Token callback received:', { 
+      shop, 
+      hasCode: !!code, 
+      hasState: !!state,
+      host 
     });
 
-    const { session } = callbackResponse;
-    
-    if (!session) {
-      throw new Error('No session returned from Shopify');
+    if (!shop || typeof shop !== 'string') {
+      throw new Error('Missing shop parameter');
     }
 
-    console.log('Offline token received, storing session');
+    if (!code || typeof code !== 'string') {
+      throw new Error('Missing authorization code');
+    }
 
-    // Store the offline session
+    // CRITICAL FIX: Manually exchange code for token (bypasses cookie validation)
+    const sanitizedShop = shopify.utils.sanitizeShop(shop);
+    
+    // Build the access token request
+    const accessTokenResponse = await new shopify.clients.Rest({
+      session: shopify.session.customAppSession(sanitizedShop),
+    }).post({
+      path: 'oauth/access_token',
+      data: {
+        client_id: process.env.SHOPIFY_API_KEY,
+        client_secret: process.env.SHOPIFY_API_SECRET,
+        code,
+      },
+    });
+
+    const { access_token, scope } = accessTokenResponse.body as {
+      access_token: string;
+      scope: string;
+    };
+
+    console.log('Access token received for:', shop);
+
+    // Create session manually
+    const session = shopify.session.customAppSession(sanitizedShop);
+    session.accessToken = access_token;
+    session.scope = scope;
+
+    // Store session
     await sessionHandler.storeSession(session);
+    console.log('Session stored successfully');
 
-    // Register webhooks with offline token
+    // Register webhooks
     try {
       const webhookRegisterResponse = await shopify.webhooks.register({
         session,
       });
       console.log('Webhooks registered:', webhookRegisterResponse);
     } catch (webhookError) {
-      console.error('Webhook registration failed (non-critical):', webhookError);
+      console.error('Webhook registration failed:', webhookError);
     }
-
-    const { shop } = session;
 
     // Mark shop as active
     await prisma.active_stores.upsert({
-      where: { shop },
-      update: { 
-        isActive: true,
-        installedAt: new Date(),
-        lastError: null
-      },
-      create: { 
-        shop, 
-        isActive: true,
-        installedAt: new Date()
-      },
+      where: { shop: sanitizedShop },
+      update: { isActive: true },
+      create: { shop: sanitizedShop, isActive: true },
     });
 
-    console.log('Shop activated:', shop);
+    console.log('Shop activated:', sanitizedShop);
 
-    // CRITICAL DECISION: Do you need online token?
-    // Option 1: Redirect directly to app (simpler)
-    const redirectUrl = `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
-    console.log('Redirecting to app:', redirectUrl);
+    // Redirect to app
+    const redirectUrl = `https://${sanitizedShop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
+    console.log('Redirecting to:', redirectUrl);
+    
     return res.redirect(redirectUrl);
 
-    // Option 2: Get online token too (uncomment if needed)
-    /*
-    console.log('Starting online token flow');
-    return await shopify.auth.begin({
-      shop: session.shop,
-      callbackPath: `/api/auth/callback`, // Points to callback.ts for online token
-      isOnline: true, // Now get online token
-      rawRequest: req,
-      rawResponse: res,
-    });
-    */
-
-  } catch (e) {
-    console.error(`---> Error at /api/auth/tokens`, e);
-
+  } catch (error) {
+    console.error('===> Token callback error:', error);
+    
     const { shop } = req.query;
-    const error = e as Error;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     if (shop && typeof shop === 'string') {
       await prisma.active_stores.upsert({
         where: { shop },
-        update: { 
-          isActive: false,
-          lastError: error.message,
-          lastErrorAt: new Date()
-        },
-        create: { 
-          shop, 
-          isActive: false,
-          lastError: error.message,
-          lastErrorAt: new Date()
-        },
+        update: { isActive: false },
+        create: { shop, isActive: false },
       });
     }
 
-    switch (true) {
-      case e instanceof InvalidOAuthError:
-        res.status(400).send(error.message);
-        break;
-      case e instanceof CookieNotFound:
-      case e instanceof InvalidSession:
-        if (shop && typeof shop === 'string') {
-          await prisma.session.deleteMany({
-            where: { shop },
-          });
-          res.redirect(`/api?shop=${shop}`);
-        } else {
-          res.status(400).send('Invalid session');
-        }
-        break;
-      default:
-        res.status(500).send(error.message);
-        break;
-    }
+    return res.status(500).send(`Authentication failed: ${errorMessage}`);
   }
 };
 

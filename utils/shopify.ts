@@ -1,4 +1,4 @@
-import { ApiVersion, DeliveryMethod, shopifyApi } from "@shopify/shopify-api";
+import { ApiVersion, DeliveryMethod, shopifyApi, Session } from "@shopify/shopify-api";
 import "@shopify/shopify-api/adapters/node";
 import appUninstallHandler from "./webhooks/app_uninstalled";
 
@@ -9,29 +9,20 @@ const shopify = shopifyApi({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET,
   scopes: process.env.SHOPIFY_API_SCOPES.split(","),
-  hostName: process.env.SHOPIFY_APP_URL.replace(/https:\/\//, ""),
+  hostName: process.env.SHOPIFY_APP_URL.replace(/https?:\/\//, ""), // Support both http and https
   hostScheme: "https",
   apiVersion: process.env.SHOPIFY_API_VERSION as ApiVersion,
   isEmbeddedApp: true,
-  logger: { level: isDev ? 0 : 0 }, //Error = 0,Warning = 1,Info = 2,Debug = 3
-  // logger: { level: LogSeverity.Debug, httpRequests: true }, //For insane levels of debugging
+  logger: { level: isDev ? 0 : 0 },
+  
+  // CRITICAL FIX: Add these for proper cookie handling in Vercel
+  isCustomStoreApp: false,
+  
+  // Future flags for better compatibility
+  billing: undefined,
 });
 
-/*
-  Template for adding new topics:
-  ```
-  TOPIC: {
-      deliveryMethod: DeliveryMethod.Http,
-      callbackUrl: "/api/webhooks/topic",
-      callback: topicHandler,
-    },
-  ```
-
-    - Webhook topic and callbackUrl topic should be exactly the same because it's using catch-all
-    - Don't change the delivery method unless you know what you're doing
-      - the method is `DeliveryMethod.Http` and not `DeliveryMethod.http`, mind the caps on `H` in `http`
-*/
-
+// Webhook handlers
 shopify.webhooks.addHandlers({
   APP_UNINSTALLED: {
     deliveryMethod: DeliveryMethod.Http,
