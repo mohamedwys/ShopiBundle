@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from "@/utils/prisma";
 import sessionHandler from "@/utils/sessionHandler";
 import shopify from "@/utils/shopify";
+import { Session } from "@shopify/shopify-api";
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
@@ -22,22 +23,32 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       throw new Error('Missing authorization code');
     }
 
-    // CRITICAL FIX: Manually exchange code for token (bypasses cookie validation)
     const sanitizedShop = shopify.utils.sanitizeShop(shop);
     
-    // Build the access token request
-    const accessTokenResponse = await new shopify.clients.Rest({
-      session: shopify.session.customAppSession(sanitizedShop),
-    }).post({
-      path: 'oauth/access_token',
-      data: {
-        client_id: process.env.SHOPIFY_API_KEY,
-        client_secret: process.env.SHOPIFY_API_SECRET,
-        code,
-      },
-    });
+    console.log('Exchanging code for access token...');
 
-    const { access_token, scope } = accessTokenResponse.body as {
+    // Manually exchange authorization code for access token
+    const tokenResponse = await fetch(
+      `https://${sanitizedShop}/admin/oauth/access_token`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: process.env.SHOPIFY_API_KEY,
+          client_secret: process.env.SHOPIFY_API_SECRET,
+          code,
+        }),
+      }
+    );
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      throw new Error(`Token exchange failed: ${errorText}`);
+    }
+
+    const tokenData = await tokenResponse.json() as {
       access_token: string;
       scope: string;
     };
@@ -45,9 +56,14 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     console.log('Access token received for:', shop);
 
     // Create session manually
-    const session = shopify.session.customAppSession(sanitizedShop);
-    session.accessToken = access_token;
-    session.scope = scope;
+    const session = new Session({
+      id: `offline_${sanitizedShop}`,
+      shop: sanitizedShop,
+      state: typeof state === 'string' ? state : '',
+      isOnline: false,
+      accessToken: tokenData.access_token,
+      scope: tokenData.scope,
+    });
 
     // Store session
     await sessionHandler.storeSession(session);
@@ -58,9 +74,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       const webhookRegisterResponse = await shopify.webhooks.register({
         session,
       });
-      console.log('Webhooks registered:', webhookRegisterResponse);
+      console.log('Webhooks registered:', JSON.stringify(webhookRegisterResponse, null, 2));
     } catch (webhookError) {
-      console.error('Webhook registration failed:', webhookError);
+      console.error('Webhook registration failed (non-critical):', webhookError);
     }
 
     // Mark shop as active
@@ -85,11 +101,15 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     if (shop && typeof shop === 'string') {
-      await prisma.active_stores.upsert({
-        where: { shop },
-        update: { isActive: false },
-        create: { shop, isActive: false },
-      });
+      try {
+        await prisma.active_stores.upsert({
+          where: { shop },
+          update: { isActive: false },
+          create: { shop, isActive: false },
+        });
+      } catch (dbError) {
+        console.error('Database error:', dbError);
+      }
     }
 
     return res.status(500).send(`Authentication failed: ${errorMessage}`);

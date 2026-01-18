@@ -1,9 +1,4 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import {
-  CookieNotFound,
-  InvalidOAuthError,
-  InvalidSession,
-} from "@shopify/shopify-api";
 import shopify from "@/utils/shopify";
 import prisma from "@/utils/prisma";
 
@@ -31,13 +26,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       return res.redirect(`/exitframe?${queryParams}`);
     }
 
-    // FIXED: Point to token.ts (your actual first callback)
     console.log('Starting OAuth for shop:', shop);
-    
-    return await shopify.auth.begin({
-      shop,
-      callbackPath: `/api/auth/tokens`, // ← Matches token.ts file
-      isOnline: false, // First get offline token
+
+    // Start OAuth flow
+    await shopify.auth.begin({
+      shop: shopify.utils.sanitizeShop(shop),
+      callbackPath: '/api/auth/tokens',
+      isOnline: false,
       rawRequest: req,
       rawResponse: res,
     });
@@ -48,46 +43,25 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     const { shop } = req.query;
     const error = e as Error;
 
-    switch (true) {
-      case e instanceof InvalidOAuthError:
-        console.error('Invalid OAuth error:', error.message);
-        res.status(400).send(error.message);
-        break;
+    if (shop && typeof shop === 'string') {
+      try {
+        await prisma.active_stores.update({
+          where: { shop },
+          data: { isActive: false },
+        });
 
-      case e instanceof CookieNotFound:
-      case e instanceof InvalidSession:
-        console.log('Session invalid, clearing data for shop:', shop);
-        
-        if (shop && typeof shop === 'string') {
-          try {
-            await prisma.active_stores.update({
-              where: { shop },
-              data: { 
-                isActive: false,
-                lastError: 'Session expired or invalid',
-                lastErrorAt: new Date()
-              },
-            });
+        await prisma.session.deleteMany({
+          where: { shop },
+        });
 
-            await prisma.session.deleteMany({
-              where: { shop },
-            });
-
-            console.log('Cleared sessions for shop:', shop);
-          } catch (dbError) {
-            console.error('Error clearing sessions:', dbError);
-          }
-          
-          res.redirect(`/api?shop=${shop}`);
-        } else {
-          res.status(400).send('Invalid shop parameter');
-        }
-        break;
-
-      default:
-        console.error('Unexpected auth error:', error);
-        res.status(500).send(error.message);
-        break;
+        console.log('Cleared sessions for shop:', shop);
+      } catch (dbError) {
+        console.error('Error clearing sessions:', dbError);
+      }
+      
+      res.redirect(`/api?shop=${shop}`);
+    } else {
+      res.status(500).send(error.message);
     }
   }
 };
