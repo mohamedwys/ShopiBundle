@@ -13,5 +13,5 @@ scopes = "write_metaobjects,read_metaobjects,write_metaobject_definitions,read_p
 [auth]
 redirect_urls = [ 
     "https://shopi-bundle.vercel.app/auth/callback",
-    "https://shopi-bundle.vercel.app/auth/shopify/callback"
+    "https://shopi-bundle.vercel.app/auth/shopify/callback",
     "https://shopi-bundle.vercel.app/api/auth/callback" ]
