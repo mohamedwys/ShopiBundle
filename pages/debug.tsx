@@ -85,7 +85,7 @@ export default function DebugPage() {
           {hasIssues && (
             <Banner
               title="Configuration Issues Detected"
-              status="critical"
+              tone="critical"
             >
               <p>
                 The app is missing required parameters or configuration.
@@ -222,7 +222,7 @@ export default function DebugPage() {
               </Text>
 
               {debugInfo.host === 'MISSING' && (
-                <Banner status="warning">
+                <Banner tone="warning">
                   <Text as="p" fontWeight="bold">Missing Host Parameter</Text>
                   <p>
                     The 'host' parameter is required for embedded apps. This usually
@@ -234,7 +234,7 @@ export default function DebugPage() {
               )}
 
               {debugInfo.shop === 'MISSING' && (
-                <Banner status="critical">
+                <Banner tone="critical">
                   <Text as="p" fontWeight="bold">Missing Shop Parameter</Text>
                   <p>The shop domain is required to identify your store.</p>
                   <p><strong>Solution:</strong> Click "Restart OAuth Flow" above</p>
@@ -242,7 +242,7 @@ export default function DebugPage() {
               )}
 
               {debugInfo.apiKey === 'MISSING' && (
-                <Banner status="critical">
+                <Banner tone="critical">
                   <Text as="p" fontWeight="bold">Missing API Key</Text>
                   <p>NEXT_PUBLIC_SHOPIFY_API_KEY environment variable is not set.</p>
                   <p><strong>Solution:</strong> Add the environment variable in Vercel and redeploy</p>
@@ -250,7 +250,7 @@ export default function DebugPage() {
               )}
 
               {!debugInfo.shopifyExists && (
-                <Banner status="warning">
+                <Banner tone="warning">
                   <Text as="p" fontWeight="bold">App Bridge Not Loaded</Text>
                   <p>The Shopify App Bridge script failed to load.</p>
                   <p><strong>Solution:</strong> Check network connection and disable ad blockers</p>
@@ -258,7 +258,7 @@ export default function DebugPage() {
               )}
 
               {!debugInfo.isInIframe && debugInfo.host !== 'MISSING' && (
-                <Banner status="info">
+                <Banner tone="info">
                   <Text as="p" fontWeight="bold">Not In iframe</Text>
                   <p>The app should be loaded inside Shopify admin iframe.</p>
                   <p><strong>Solution:</strong> This is normal for initial OAuth flow</p>
