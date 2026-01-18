@@ -14,10 +14,10 @@ const shopify = shopifyApi({
   apiVersion: process.env.SHOPIFY_API_VERSION as ApiVersion,
   isEmbeddedApp: true,
   logger: { level: isDev ? 0 : 0 },
-  
-  // CRITICAL FIX: Add these for proper cookie handling in Vercel
-  isCustomStoreApp: false,
-  
+
+  // CRITICAL: Use session tokens instead of cookies for embedded apps
+  useOnlineTokens: true,
+
   // Future flags for better compatibility
   billing: undefined,
 });
