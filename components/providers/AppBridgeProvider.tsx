@@ -1,4 +1,4 @@
-import { Layout, Page, Spinner, BlockStack } from "@shopify/polaris";
+import { Layout, Page, Spinner, BlockStack, Button, Text, Card } from "@shopify/polaris";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
@@ -6,6 +6,7 @@ function AppBridgeProvider({ children }) {
   const router = useRouter();
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState(null);
+  const [shop, setShop] = useState(null);
 
   useEffect(() => {
     // Wait for Next.js router to be fully ready before checking query params
@@ -26,29 +27,12 @@ function AppBridgeProvider({ children }) {
       return;
     }
 
-    // If no host parameter, handle missing host scenario
+    // If no host parameter but we have shop, show error (don't auto-redirect to avoid loops)
     if (!host && shop) {
-      // Check if we've already attempted redirect to prevent infinite loop
-      const redirectAttempts = parseInt(sessionStorage.getItem('authRedirectAttempts') || '0');
-
-      if (redirectAttempts < 2) {
-        console.log(`Missing host parameter, redirecting to auth (attempt ${redirectAttempts + 1})`);
-        sessionStorage.setItem('authRedirectAttempts', String(redirectAttempts + 1));
-
-        // Redirect to Shopify admin to reload the app with proper host parameter
-        const shopifyAdminUrl = `https://${shop}/admin/apps/${apiKey}`;
-        window.top.location.href = shopifyAdminUrl;
-        return;
-      } else {
-        // After 2 failed attempts, show error instead of looping
-        console.error('Failed to get host parameter after multiple attempts');
-        sessionStorage.removeItem('authRedirectAttempts');
-        setError(
-          `Unable to load app properly. The 'host' parameter is missing. ` +
-          `Please reinstall the app or contact support. Shop: ${shop}`
-        );
-        return;
-      }
+      console.error('Missing host parameter - app must be accessed through Shopify admin');
+      setShop(shop);
+      setError('missing_host');
+      return;
     }
 
     // If neither host nor shop, show error
@@ -57,9 +41,9 @@ function AppBridgeProvider({ children }) {
       return;
     }
 
-    // Clear redirect attempts counter on successful load
+    // Clear any stored shop value on successful load
     if (host && shop) {
-      sessionStorage.removeItem('authRedirectAttempts');
+      setShop(null);
     }
 
     // Initialize shopify global with the app bridge
@@ -86,6 +70,75 @@ function AppBridgeProvider({ children }) {
     }
   }, [router.isReady, router.query]);
 
+  // Special handling for missing_host error
+  if (error === 'missing_host' && shop) {
+    const handleReauth = () => {
+      sessionStorage.clear();
+      const authUrl = `/api/auth?shop=${shop}`;
+      if (window !== window.top) {
+        window.top.location.href = authUrl;
+      } else {
+        window.location.href = authUrl;
+      }
+    };
+
+    const handleShopifyAdmin = () => {
+      sessionStorage.clear();
+      window.top.location.href = `https://${shop}/admin/apps`;
+    };
+
+    return (
+      <Page>
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h2" variant="headingLg">
+                  Missing Host Parameter
+                </Text>
+                <Text as="p">
+                  This app is missing the required 'host' parameter, which means it wasn't loaded through Shopify Admin correctly.
+                </Text>
+                <Text as="p" tone="subdued">
+                  Shop: <strong>{shop}</strong>
+                </Text>
+                <BlockStack gap="200">
+                  <Text as="h3" variant="headingMd">
+                    Try these solutions:
+                  </Text>
+                  <Text as="p">
+                    1. Access the app through <strong>Shopify Admin → Apps → ShopiBundle</strong>
+                  </Text>
+                  <Text as="p">
+                    2. Or click one of the buttons below to fix the issue:
+                  </Text>
+                </BlockStack>
+                <BlockStack gap="200">
+                  <Button variant="primary" onClick={handleReauth} fullWidth>
+                    Restart OAuth Authorization
+                  </Button>
+                  <Button onClick={handleShopifyAdmin} fullWidth>
+                    Go to Shopify Admin Apps
+                  </Button>
+                  <Button
+                    onClick={() => { sessionStorage.clear(); window.location.reload(); }}
+                    fullWidth
+                  >
+                    Clear Cache & Reload
+                  </Button>
+                </BlockStack>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  If the problem persists, try accessing the app in a private/incognito browser window.
+                </Text>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    );
+  }
+
+  // Handle other errors
   if (error) {
     return (
       <Page>
@@ -96,7 +149,7 @@ function AppBridgeProvider({ children }) {
                 <p style={{ color: '#bf0711', fontWeight: 'bold', marginBottom: '10px' }}>
                   App Initialization Error
                 </p>
-                <p>{error}</p>
+                <p style={{ whiteSpace: 'pre-line' }}>{error}</p>
                 <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
                   Check browser console for details.
                 </p>
