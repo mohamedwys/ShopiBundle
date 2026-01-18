@@ -8,29 +8,58 @@ function AppBridgeProvider({ children }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // Wait for Next.js router to be fully ready before checking query params
+    if (!router.isReady) {
+      console.log('Router not ready yet, waiting...');
+      return;
+    }
+
     const host = router.query?.host;
     const shop = router.query?.shop;
     const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY;
 
     // Debug logging
-    console.log('AppBridgeProvider init:', { host, shop, apiKey: apiKey ? 'set' : 'missing' });
+    console.log('AppBridgeProvider init (router ready):', { host, shop, apiKey: apiKey ? 'set' : 'missing' });
 
     if (!apiKey) {
       setError('NEXT_PUBLIC_SHOPIFY_API_KEY environment variable is missing');
       return;
     }
 
-    // If no host parameter, redirect to auth with shop parameter
+    // If no host parameter, handle missing host scenario
     if (!host && shop) {
-      console.log('Missing host parameter, redirecting to auth');
-      window.location.href = `/api/auth?shop=${shop}`;
-      return;
+      // Check if we've already attempted redirect to prevent infinite loop
+      const redirectAttempts = parseInt(sessionStorage.getItem('authRedirectAttempts') || '0');
+
+      if (redirectAttempts < 2) {
+        console.log(`Missing host parameter, redirecting to auth (attempt ${redirectAttempts + 1})`);
+        sessionStorage.setItem('authRedirectAttempts', String(redirectAttempts + 1));
+
+        // Redirect to Shopify admin to reload the app with proper host parameter
+        const shopifyAdminUrl = `https://${shop}/admin/apps/${apiKey}`;
+        window.top.location.href = shopifyAdminUrl;
+        return;
+      } else {
+        // After 2 failed attempts, show error instead of looping
+        console.error('Failed to get host parameter after multiple attempts');
+        sessionStorage.removeItem('authRedirectAttempts');
+        setError(
+          `Unable to load app properly. The 'host' parameter is missing. ` +
+          `Please reinstall the app or contact support. Shop: ${shop}`
+        );
+        return;
+      }
     }
 
     // If neither host nor shop, show error
     if (!host && !shop) {
       setError('Missing required query parameters. Please access this app through Shopify admin.');
       return;
+    }
+
+    // Clear redirect attempts counter on successful load
+    if (host && shop) {
+      sessionStorage.removeItem('authRedirectAttempts');
     }
 
     // Initialize shopify global with the app bridge
@@ -55,7 +84,7 @@ function AppBridgeProvider({ children }) {
 
       return () => clearInterval(checkShopify);
     }
-  }, [router.query]);
+  }, [router.isReady, router.query]);
 
   if (error) {
     return (
