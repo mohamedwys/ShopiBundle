@@ -1,82 +1,65 @@
-import { Page, Layout, Spinner } from "@shopify/polaris";
+// components/providers/AppBridgeProvider.tsx
+import { Page, Layout, Spinner, Card, Text, BlockStack, Button } from "@shopify/polaris";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
-interface AppBridgeProviderProps {
-  children: React.ReactNode;
-}
-
-const AppBridgeProvider: React.FC<AppBridgeProviderProps> = ({ children }) => {
+export default function AppBridgeProvider({ children }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [shop, setShop] = useState<string | null>(null);
+  const [host, setHost] = useState<string | null>(null);
 
   useEffect(() => {
     if (!router.isReady) return;
 
-    const host = router.query.host as string;
-    const shop = router.query.shop as string;
+    const hostParam = router.query.host?.toString() || null;
+    const shopParam = router.query.shop?.toString() || null;
     const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY;
 
+    setShop(shopParam);
+    setHost(hostParam);
+
     if (!apiKey) {
-      setError("Missing NEXT_PUBLIC_SHOPIFY_API_KEY");
+      console.error("Missing NEXT_PUBLIC_SHOPIFY_API_KEY environment variable");
       return;
     }
 
-    if (!host || !shop) {
-      setError("Missing 'host' or 'shop' query parameter. Access via Shopify Admin.");
-      return;
-    }
-
-    // Initialize App Bridge script loaded on page
-    if ((window as any).shopify) {
+    if (hostParam && shopParam) {
       setReady(true);
-    } else {
-      const interval = setInterval(() => {
-        if ((window as any).shopify) {
-          clearInterval(interval);
-          setReady(true);
-        }
-      }, 100);
-      setTimeout(() => clearInterval(interval), 5000); // stop after 5s
+      return;
+    }
+
+    // If host is missing but shop exists, redirect to OAuth
+    if (!hostParam && shopParam) {
+      const authUrl = `/api/auth?shop=${shopParam}`;
+      if (window !== window.top) {
+        window.top.location.href = authUrl;
+      } else {
+        window.location.href = authUrl;
+      }
     }
   }, [router.isReady, router.query]);
-
-  if (error) {
-    return (
-      <Page>
-        <Layout>
-          <Layout.Section>
-            <div style={{ padding: 20 }}>
-              <h2 style={{ color: "#bf0711" }}>App Initialization Error</h2>
-              <p>{error}</p>
-              <button
-                style={{ marginTop: 10 }}
-                onClick={() => router.reload()}
-              >
-                Reload App
-              </button>
-            </div>
-          </Layout.Section>
-        </Layout>
-      </Page>
-    );
-  }
 
   if (!ready) {
     return (
       <Page>
         <Layout>
           <Layout.Section>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                padding: 50,
-              }}
-            >
+            <BlockStack align="center">
               <Spinner size="large" />
-            </div>
+              {(!shop || !host) && (
+                <Card>
+                  <BlockStack gap="200">
+                    <Text as="p" variant="bodyMd" alignment="center">
+                      Waiting for Shopify Admin parameters...
+                    </Text>
+                    <Text as="p" variant="bodyMd" alignment="center">
+                      Make sure you opened this app from the Shopify Admin dashboard.
+                    </Text>
+                  </BlockStack>
+                </Card>
+              )}
+            </BlockStack>
           </Layout.Section>
         </Layout>
       </Page>
@@ -84,6 +67,4 @@ const AppBridgeProvider: React.FC<AppBridgeProviderProps> = ({ children }) => {
   }
 
   return <>{children}</>;
-};
-
-export default AppBridgeProvider;
+}

@@ -1,3 +1,4 @@
+// pages/_app.tsx
 import { AppProvider as PolarisProvider } from "@shopify/polaris";
 import "@shopify/polaris/build/esm/styles.css";
 import Head from "next/head";
@@ -6,7 +7,7 @@ import { I18nContext, I18nManager, useI18n } from "@shopify/react-i18n";
 import en from "@/translations/en.json";
 import shopifyTranslations from "@shopify/polaris/locales/en.json";
 
-const Providers = ({ children }) => {
+export default function App({ Component, pageProps }) {
   const [i18n, ShareTranslations] = useI18n({
     id: "app",
     fallback: { ...en, ...shopifyTranslations },
@@ -15,20 +16,11 @@ const Providers = ({ children }) => {
       const dictionaryPolaris = await import(
         `@shopify/polaris/locales/${locale}.json`
       );
+
       return { ...dictionary.default, ...dictionaryPolaris.default };
     },
   });
 
-  return (
-    <PolarisProvider i18n={i18n.translations}>
-      <ShareTranslations>
-        <AppBridgeProvider>{children}</AppBridgeProvider>
-      </ShareTranslations>
-    </PolarisProvider>
-  );
-};
-
-export default function App({ Component, pageProps }) {
   const locale = pageProps.locale || "en";
   const i18nManager = new I18nManager({
     locale,
@@ -46,9 +38,13 @@ export default function App({ Component, pageProps }) {
         />
       </Head>
       <I18nContext.Provider value={i18nManager}>
-        <Providers>
-          <Component {...pageProps} />
-        </Providers>
+        <PolarisProvider i18n={i18n.translations}>
+          <ShareTranslations>
+            <AppBridgeProvider>
+              <Component {...pageProps} />
+            </AppBridgeProvider>
+          </ShareTranslations>
+        </PolarisProvider>
       </I18nContext.Provider>
     </>
   );

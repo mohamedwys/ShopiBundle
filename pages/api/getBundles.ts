@@ -1,31 +1,40 @@
-import { NextApiHandler } from "next";
-import clientProvider from "@/utils/clientProvider";
+// pages/api/getBundles.ts
+import type { NextApiHandler } from "next";
 import withMiddleware from "@/utils/middleware/withMiddleware";
+import clientProvider from "@/utils/clientProvider";
 import { getBundles } from "@/utils/shopifyQueries";
 
 const handler: NextApiHandler = async (req, res) => {
   if (req.method !== "POST") {
-    return res.status(400).json({ error: "Only POST requests allowed." });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
     // Get Shopify GraphQL client with online session
-    const { client } = await clientProvider.graphqlClient({ req, res, isOnline: true });
+    const { client, shop } = await clientProvider.graphqlClient({
+      req,
+      res,
+      isOnline: true,
+    });
 
     const { after, cursor } = req.body;
 
-    // Fetch bundles from Shopify
-    const response = await getBundles(client, after, cursor);
+    const bundlesResponse = await getBundles(client, after, cursor);
 
-    return res.status(200).json(response);
+    return res.status(200).json({ shop, bundles: bundlesResponse });
   } catch (error: any) {
-    console.error("Error in /api/getBundles:", error.message || error);
-    return res.status(403).json({ error: error.message || "No session found or invalid request." });
+    console.error("Error in getBundles API:", error.message || error);
+    return res.status(403).json({
+      error: "No session found or invalid session",
+      message: error.message || null,
+    });
   }
 };
 
 export const config = {
-  api: { externalResolver: true },
+  api: {
+    externalResolver: true,
+  },
 };
 
 export default withMiddleware("verifyRequest")(handler);

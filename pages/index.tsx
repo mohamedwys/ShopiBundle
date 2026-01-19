@@ -1,12 +1,10 @@
-import { Page, Layout, Card, Spinner, Text, Button } from "@shopify/polaris";
+import { Page, Layout, Card, Text, Button, Spinner, BlockStack, InlineStack } from "@shopify/polaris";
 import { useEffect, useState } from "react";
 
 interface Bundle {
   id: string;
   name: string;
   discount: string;
-  minPrice: string;
-  maxPrice: string;
 }
 
 export default function Home() {
@@ -16,8 +14,6 @@ export default function Home() {
 
   const fetchBundles = async () => {
     setLoading(true);
-    setError(null);
-
     try {
       const response = await fetch("/api/getBundles", {
         method: "POST",
@@ -25,21 +21,16 @@ export default function Home() {
         body: JSON.stringify({ after: null, cursor: null }),
       });
 
-      if (response.status === 403) {
-        setError(
-          "No active session found. Please reload the app from Shopify Admin."
-        );
-        setLoading(false);
-        return;
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text);
       }
 
-      const data = await response.json();
-      const bundlesData = typeof data === "string" ? JSON.parse(data) : data;
-
-      setBundles(bundlesData);
-    } catch (err) {
+      const data: Bundle[] = await response.json();
+      setBundles(data);
+    } catch (err: any) {
       console.error("Error fetching bundles:", err);
-      setError("Failed to fetch bundles. Check console for details.");
+      setError(err.message || "Failed to load bundles");
     } finally {
       setLoading(false);
     }
@@ -51,24 +42,12 @@ export default function Home() {
 
   if (loading) {
     return (
-      <Page>
+      <Page title="Bundles">
         <Layout>
           <Layout.Section>
-            <Card>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  padding: "20px",
-                }}
-              >
-                <Spinner size="large" />
-                <Text as="p" variant="bodyMd">
-                  Loading bundles...
-                </Text>
-              </div>
-            </Card>
+            <div style={{ textAlign: "center", padding: "20px" }}>
+              <Spinner size="large" />
+            </div>
           </Layout.Section>
         </Layout>
       </Page>
@@ -77,20 +56,19 @@ export default function Home() {
 
   if (error) {
     return (
-      <Page>
+      <Page title="Bundles">
         <Layout>
           <Layout.Section>
             <Card>
-              <div style={{ padding: "20px" }}>
+              <BlockStack>
                 <Text as="p" variant="headingMd">
+                  Error
+                </Text>
+                <Text as="p" variant="bodyMd">
                   {error}
                 </Text>
-                <div style={{ marginTop: "10px" }}>
-                  <Button onClick={fetchBundles} variant="primary">
-                    Retry
-                  </Button>
-                </div>
-              </div>
+                <Button onClick={fetchBundles}>Retry</Button>
+              </BlockStack>
             </Card>
           </Layout.Section>
         </Layout>
@@ -101,31 +79,20 @@ export default function Home() {
   return (
     <Page title="Bundles">
       <Layout>
-        {bundles.length === 0 ? (
-          <Layout.Section>
+        {bundles.map((bundle) => (
+          <Layout.Section key={bundle.id}>
             <Card>
-              <div style={{ padding: "20px" }}>
-                <Text as="p">No bundles found. Create your first bundle!</Text>
-              </div>
+              <BlockStack>
+                <Text as="p" variant="headingMd">
+                  {bundle.name}
+                </Text>
+                <Text as="p" variant="bodyMd">
+                  Discount: {bundle.discount}
+                </Text>
+              </BlockStack>
             </Card>
           </Layout.Section>
-        ) : (
-          bundles.map((bundle) => (
-            <Layout.Section key={bundle.id}>
-              <Card>
-                <div style={{ padding: "20px" }}>
-                  <Text as="p" variant="headingMd">
-                    {bundle.name}
-                  </Text>
-                  <Text as="p">Discount: {bundle.discount}</Text>
-                  <Text as="p">
-                    Price range: {bundle.minPrice} – {bundle.maxPrice}
-                  </Text>
-                </div>
-              </Card>
-            </Layout.Section>
-          ))
-        )}
+        ))}
       </Layout>
     </Page>
   );
