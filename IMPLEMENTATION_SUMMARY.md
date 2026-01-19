@@ -324,16 +324,41 @@ After deployment, merchants should see:
 
 **Branch:** `claude/audit-shopify-bundle-app-PYAQO`
 
-**Commit Hash:** `65541e3`
+**Main Commits:**
+- `65541e3` - Fix all critical issues and implement enhancements (20 files, 3,203+ insertions)
+- `b532fc8` - Add comprehensive implementation summary
+- `7596196` - Fix TypeScript error: clientProvider type mismatch
+- `c12f729` - Fix TypeScript error: resourcePicker missing filter property
+- `b22a167` - Update TypeScript fix documentation
 
-**Changes:**
-- 20 files changed
-- 3,203 insertions(+)
-- 57 deletions(-)
+**Total Changes:**
+- 21 files changed
+- 3,380+ insertions
+- 60 deletions
+
+**Status:** ✅ All TypeScript compilation errors fixed
 
 **Pushed to:** `origin/claude/audit-shopify-bundle-app-PYAQO`
 
 **Create PR:** https://github.com/mohamedwys/ShopiBundle/pull/new/claude/audit-shopify-bundle-app-PYAQO
+
+---
+
+## 🔧 TypeScript Compilation Fixes
+
+During deployment, two TypeScript errors were identified and fixed:
+
+### Error 1: ClientProvider Type Mismatch
+**File:** `pages/api/proxy_route/bundles-for-product.ts`
+**Issue:** Passing string directly instead of object to `clientProvider.offline.graphqlClient()`
+**Fix:** Changed `clientProvider.offline.graphqlClient(shop as string)` to `clientProvider.offline.graphqlClient({ shop: shop as string })`
+
+### Error 2: ResourcePicker Missing Filter Property
+**File:** `pages/edit_bundle.tsx`
+**Issue:** Shopify App Bridge `resourcePicker` requires `filter` property
+**Fix:** Added `filter: { variants: true }` to resourcePicker configuration
+
+**Documentation:** See `TYPESCRIPT_FIX.md` for complete details.
 
 ---
 
