@@ -1,58 +1,61 @@
 import { ApiVersion } from "@shopify/shopify-api";
-import sessionHandler from "./sessionHandler";
 import shopify from "./shopify";
+import sessionHandler from "./sessionHandler";
 
 const currentApiVersion = ApiVersion.January23;
 
-interface ClientProviderParams {
-  req?: any;
-  res?: any;
-  isOnline?: boolean;
-  shop?: string;
+async function fetchSession({ req, res, isOnline }: { req?: any; res?: any; isOnline: boolean }) {
+  // Get session ID from Shopify
+  const sessionId = await shopify.session.getCurrentId({
+    isOnline,
+    rawRequest: req,
+    rawResponse: res,
+  });
+
+  // Load session from Prisma
+  const session = await sessionHandler.loadSession(sessionId);
+
+  if (!session) throw new Error(`No session found for id: ${sessionId}`);
+
+  return session;
 }
 
-// Fetch the session from DB
-const fetchSession = async ({ req, res, isOnline, shop }: ClientProviderParams) => {
-  if (shop) {
-    // Offline session
-    const sessionId = shopify.session.getOfflineId(shop);
-    return await sessionHandler.loadSession(sessionId);
-  }
-
-  // Online session
-  if (!req || !res) throw new Error("req and res are required for online session");
-  const sessionId = await shopify.session.getCurrentId({ isOnline: !!isOnline, rawRequest: req, rawResponse: res });
-  return await sessionHandler.loadSession(sessionId);
-};
-
-const graphqlClient = async ({ req, res, isOnline, shop }: ClientProviderParams) => {
-  const session = await fetchSession({ req, res, isOnline, shop });
-  if (!session) throw new Error("No session found");
-
+async function graphqlClient({ req, res, isOnline }: { req?: any; res?: any; isOnline: boolean }) {
+  const session = await fetchSession({ req, res, isOnline });
   const client = new shopify.clients.Graphql({ session });
   return { client, shop: session.shop, session };
-};
+}
 
-const restClient = async ({ req, res, isOnline, shop }: ClientProviderParams) => {
-  const session = await fetchSession({ req, res, isOnline, shop });
-  if (!session) throw new Error("No session found");
-
+async function restClient({ req, res, isOnline }: { req?: any; res?: any; isOnline: boolean }) {
+  const session = await fetchSession({ req, res, isOnline });
   const client = new shopify.clients.Rest({
     session,
     apiVersion: currentApiVersion,
   });
-
   return { client, shop: session.shop, session };
-};
+}
 
-// Offline clients for background tasks
+// Offline clients (without request/response)
+async function fetchOfflineSession(shop: string) {
+  const sessionID = shopify.session.getOfflineId(shop);
+  const session = await sessionHandler.loadSession(sessionID);
+  if (!session) throw new Error(`No offline session found for shop: ${shop}`);
+  return session;
+}
+
 const offline = {
   graphqlClient: async ({ shop }: { shop: string }) => {
-    return graphqlClient({ shop });
+    const session = await fetchOfflineSession(shop);
+    const client = new shopify.clients.Graphql({ session });
+    return { client, shop, session };
   },
   restClient: async ({ shop }: { shop: string }) => {
-    return restClient({ shop });
+    const session = await fetchOfflineSession(shop);
+    const client = new shopify.clients.Rest({ session, apiVersion: currentApiVersion });
+    return { client, shop, session };
   },
 };
 
-export default { graphqlClient, restClient, offline };
+const clientProvider = { graphqlClient, restClient, offline };
+
+export default clientProvider;
