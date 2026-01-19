@@ -146,6 +146,9 @@ const EditBundlePage: NextPage = () => {
       type: "product",
       multiple: true,
       action: "select",
+      filter: {
+        variants: true,
+      },
     });
 
     if (selectedProducts && selectedProducts.length > 0) {
