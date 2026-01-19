@@ -1,177 +1,82 @@
-import { Layout, Page, Spinner, BlockStack, Button, Text, Card } from "@shopify/polaris";
+import { Page, Layout, Spinner } from "@shopify/polaris";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
-function AppBridgeProvider({ children }) {
+interface AppBridgeProviderProps {
+  children: React.ReactNode;
+}
+
+const AppBridgeProvider: React.FC<AppBridgeProviderProps> = ({ children }) => {
   const router = useRouter();
-  const [isReady, setIsReady] = useState(false);
-  const [error, setError] = useState(null);
-  const [shop, setShop] = useState(null);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Wait for Next.js router to be fully ready before checking query params
-    if (!router.isReady) {
-      console.log('Router not ready yet, waiting...');
-      return;
-    }
+    if (!router.isReady) return;
 
-    const host = router.query?.host;
-    const shop = router.query?.shop;
+    const host = router.query.host as string;
+    const shop = router.query.shop as string;
     const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY;
 
-    // Debug logging
-    console.log('AppBridgeProvider init (router ready):', { host, shop, apiKey: apiKey ? 'set' : 'missing' });
-
     if (!apiKey) {
-      setError('NEXT_PUBLIC_SHOPIFY_API_KEY environment variable is missing');
+      setError("Missing NEXT_PUBLIC_SHOPIFY_API_KEY");
       return;
     }
 
-    // If we have both host and shop, clear any previous errors and proceed
-    if (host && shop) {
-      setError(null);
-      setShop(null);
-    }
-    // If no host parameter but we have shop, show error (don't auto-redirect to avoid loops)
-    else if (!host && shop) {
-      console.error('Missing host parameter - app must be accessed through Shopify admin');
-      setShop(shop);
-      setError('missing_host');
-      return;
-    }
-    // If neither host nor shop after router is ready, it might still be loading
-    // Wait a bit before showing error
-    else if (!host && !shop) {
-      // Don't immediately show error - parameters might still be loading
-      console.log('Waiting for query parameters to load...');
+    if (!host || !shop) {
+      setError("Missing 'host' or 'shop' query parameter. Access via Shopify Admin.");
       return;
     }
 
-    // Initialize shopify global with the app bridge
-    if (window.shopify) {
-      setIsReady(true);
+    // Initialize App Bridge script loaded on page
+    if ((window as any).shopify) {
+      setReady(true);
     } else {
-      // Wait for the script to load (max 5 seconds)
-      let attempts = 0;
-      const maxAttempts = 50; // 5 seconds
-
-      const checkShopify = setInterval(() => {
-        attempts++;
-
-        if (window.shopify) {
-          clearInterval(checkShopify);
-          setIsReady(true);
-        } else if (attempts >= maxAttempts) {
-          clearInterval(checkShopify);
-          setError('App Bridge failed to load. Please refresh the page.');
+      const interval = setInterval(() => {
+        if ((window as any).shopify) {
+          clearInterval(interval);
+          setReady(true);
         }
       }, 100);
-
-      return () => clearInterval(checkShopify);
+      setTimeout(() => clearInterval(interval), 5000); // stop after 5s
     }
   }, [router.isReady, router.query]);
 
-  // Special handling for missing_host error
-  // Only show error if we CURRENTLY don't have host parameter
-  if (error === 'missing_host' && shop && !router.query?.host) {
-    const handleReauth = () => {
-      sessionStorage.clear();
-      const authUrl = `/api?shop=${shop}`;  // Fixed: /api not /api/auth
-      if (window !== window.top) {
-        window.top.location.href = authUrl;
-      } else {
-        window.location.href = authUrl;
-      }
-    };
-
-    const handleShopifyAdmin = () => {
-      sessionStorage.clear();
-      window.top.location.href = `https://${shop}/admin/apps`;
-    };
-
+  if (error) {
     return (
       <Page>
         <Layout>
           <Layout.Section>
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h2" variant="headingLg">
-                  Missing Host Parameter
-                </Text>
-                <Text as="p">
-                  This app is missing the required 'host' parameter, which means it wasn't loaded through Shopify Admin correctly.
-                </Text>
-                <Text as="p" tone="subdued">
-                  Shop: <strong>{shop}</strong>
-                </Text>
-                <BlockStack gap="200">
-                  <Text as="h3" variant="headingMd">
-                    Try these solutions:
-                  </Text>
-                  <Text as="p">
-                    1. Access the app through <strong>Shopify Admin → Apps → ShopiBundle</strong>
-                  </Text>
-                  <Text as="p">
-                    2. Or click one of the buttons below to fix the issue:
-                  </Text>
-                </BlockStack>
-                <BlockStack gap="200">
-                  <Button variant="primary" onClick={handleReauth} fullWidth>
-                    Restart OAuth Authorization
-                  </Button>
-                  <Button onClick={handleShopifyAdmin} fullWidth>
-                    Go to Shopify Admin Apps
-                  </Button>
-                  <Button
-                    onClick={() => { sessionStorage.clear(); window.location.reload(); }}
-                    fullWidth
-                  >
-                    Clear Cache & Reload
-                  </Button>
-                </BlockStack>
-                <Text as="p" variant="bodyMd" tone="subdued">
-                  If the problem persists, try accessing the app in a private/incognito browser window.
-                </Text>
-              </BlockStack>
-            </Card>
+            <div style={{ padding: 20 }}>
+              <h2 style={{ color: "#bf0711" }}>App Initialization Error</h2>
+              <p>{error}</p>
+              <button
+                style={{ marginTop: 10 }}
+                onClick={() => router.reload()}
+              >
+                Reload App
+              </button>
+            </div>
           </Layout.Section>
         </Layout>
       </Page>
     );
   }
 
-  // Handle other errors - but only if we don't have valid parameters
-  // This prevents showing stale error state when parameters become available
-  if (error && !(router.query?.host && router.query?.shop)) {
+  if (!ready) {
     return (
       <Page>
         <Layout>
           <Layout.Section>
-            <BlockStack align="center" inlineAlign="center">
-              <div style={{ padding: '20px', textAlign: 'center' }}>
-                <p style={{ color: '#bf0711', fontWeight: 'bold', marginBottom: '10px' }}>
-                  App Initialization Error
-                </p>
-                <p style={{ whiteSpace: 'pre-line' }}>{error}</p>
-                <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
-                  Check browser console for details.
-                </p>
-              </div>
-            </BlockStack>
-          </Layout.Section>
-        </Layout>
-      </Page>
-    );
-  }
-
-  if (!isReady) {
-    return (
-      <Page>
-        <Layout>
-          <Layout.Section>
-            <BlockStack align="center">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                padding: 50,
+              }}
+            >
               <Spinner size="large" />
-            </BlockStack>
+            </div>
           </Layout.Section>
         </Layout>
       </Page>
@@ -179,6 +84,6 @@ function AppBridgeProvider({ children }) {
   }
 
   return <>{children}</>;
-}
+};
 
 export default AppBridgeProvider;

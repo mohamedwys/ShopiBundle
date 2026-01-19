@@ -1,35 +1,29 @@
-import withMiddleware from "@/utils/middleware/withMiddleware";
-import clientProvider from "@/utils/clientProvider";
 import { NextApiHandler } from "next";
+import clientProvider from "@/utils/clientProvider";
 import { getBundles } from "@/utils/shopifyQueries";
+import withMiddleware from "@/utils/middleware/withMiddleware";
 
 const handler: NextApiHandler = async (req, res) => {
-  //Reject anything that's not a POST
   if (req.method !== "POST") {
-    return res.status(400).send({ text: "We don't do that here." });
+    return res.status(400).json({ error: "Invalid request method" });
   }
-
-  const { client, shop, session } = await clientProvider.graphqlClient({
-    req,
-    res,
-    isOnline: true,
-  });
 
   try {
-    const data = JSON.parse(req.body);
-    const response = await getBundles(client, data.after, data.cursor);
-    const bundles = JSON.stringify(response);
-    return res.status(200).json(bundles);
-  } catch (error) {
-    console.error("Exception while getting bundles:", error);
-    return res.status(500).send("message: Error while getting bundles");
+    // Use online session for embedded Shopify app
+    const { client } = await clientProvider.graphqlClient({ req, res, isOnline: true });
+
+    const { after, cursor } = req.body ? JSON.parse(req.body) : {};
+    const response = await getBundles(client, after, cursor);
+
+    return res.status(200).json(response);
+  } catch (error: any) {
+    console.error("Error fetching bundles:", error);
+    if (error.message.includes("No session found")) {
+      return res.status(403).json({ error: "No session found. Please refresh the app." });
+    }
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
-export const config = {
-  api: {
-    externalResolver: true,
-  },
-};
-
+// Wrap with Shopify session verification middleware
 export default withMiddleware("verifyRequest")(handler);

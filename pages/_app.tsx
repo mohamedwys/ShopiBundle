@@ -5,7 +5,6 @@ import AppBridgeProvider from "@/components/providers/AppBridgeProvider";
 import { I18nContext, I18nManager, useI18n } from "@shopify/react-i18n";
 import en from "@/translations/en.json";
 import shopifyTranslations from "@shopify/polaris/locales/en.json";
-import { useRouter } from "next/router";
 
 const Providers = ({ children }) => {
   const [i18n, ShareTranslations] = useI18n({
@@ -16,7 +15,6 @@ const Providers = ({ children }) => {
       const dictionaryPolaris = await import(
         `@shopify/polaris/locales/${locale}.json`
       );
-
       return { ...dictionary.default, ...dictionaryPolaris.default };
     },
   });
@@ -31,9 +29,7 @@ const Providers = ({ children }) => {
 };
 
 export default function App({ Component, pageProps }) {
-  const router = useRouter();
-
-  const locale = router?.query["locale"]?.toString() || "en";
+  const locale = pageProps.locale || "en";
   const i18nManager = new I18nManager({
     locale,
     onError(error) {
@@ -44,7 +40,6 @@ export default function App({ Component, pageProps }) {
   return (
     <>
       <Head>
-        {/* App Bridge 4.x Script - loads globally */}
         <script
           src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
           data-api-key={process.env.NEXT_PUBLIC_SHOPIFY_API_KEY}
