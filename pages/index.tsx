@@ -2,6 +2,7 @@ import { Page, Layout, Card, Text, Button, Spinner, BlockStack, InlineStack } fr
 import { useEffect, useState } from "react";
 import { useAppBridge } from "@/components/providers/AppBridgeProvider";
 import { getSessionToken } from "@shopify/app-bridge/utilities";
+import { Redirect } from "@shopify/app-bridge/actions";
 
 interface Bundle {
   id: string;
@@ -19,6 +20,17 @@ export default function Home() {
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [error, setError] = useState<string | null>(null);
   const { app } = useAppBridge();
+
+  const handleAuthError = () => {
+    if (app) {
+      // Redirect to auth if session is missing
+      const redirect = Redirect.create(app);
+      redirect.dispatch(Redirect.Action.REMOTE, {
+        url: `/api/auth?shop=${new URLSearchParams(window.location.search).get('shop')}`,
+        newContext: false,
+      });
+    }
+  };
 
   const fetchBundles = async () => {
     setLoading(true);
@@ -45,12 +57,19 @@ export default function Home() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        
+        // If it's an auth error, redirect to auth
+        if (response.status === 401 || response.status === 403) {
+          handleAuthError();
+          return;
+        }
+        
         throw new Error(errorData.error || errorData.message || "Failed to load bundles");
       }
 
       const data: BundlesApiResponse = await response.json();
       
-      // Extract bundles from the response (adjust based on your actual data structure)
+      // Extract bundles from the response
       const bundlesData = Array.isArray(data.bundles?.edges) 
         ? data.bundles.edges.map((edge: any) => ({
             id: edge.node.id,
@@ -102,8 +121,9 @@ export default function Home() {
                 <Text as="p" variant="bodyMd">
                   {error}
                 </Text>
-                <InlineStack align="start">
+                <InlineStack align="start" gap="200">
                   <Button onClick={fetchBundles}>Retry</Button>
+                  <Button onClick={handleAuthError}>Reinstall App</Button>
                 </InlineStack>
               </BlockStack>
             </Card>

@@ -27,13 +27,35 @@ const handler = async (
   }
 
   try {
-    // Get Shopify GraphQL client with online session
-    // The verifyRequest middleware should have already validated the session token
-    const { client, shop } = await clientProvider.graphqlClient({
-      req,
-      res,
-      isOnline: true,
-    });
+    // Try to get online session first, fallback to offline if not available
+    let client, shop;
+    
+    try {
+      const result = await clientProvider.graphqlClient({
+        req,
+        res,
+        isOnline: true,
+      });
+      client = result.client;
+      shop = result.shop;
+    } catch (onlineError) {
+      console.log('Online session not found, trying offline session...');
+      
+      // Fallback to offline session
+      // Extract shop from session or request
+      const shopDomain = req.headers['x-shop-domain'] as string || 
+                         req.query.shop as string;
+      
+      if (!shopDomain) {
+        throw new Error('No shop domain found in request');
+      }
+      
+      const result = await clientProvider.offline.graphqlClient({
+        shop: shopDomain,
+      });
+      client = result.client;
+      shop = result.shop;
+    }
 
     const { after, cursor } = req.body as BundlesRequestBody;
 
@@ -46,6 +68,15 @@ const handler = async (
     return res.status(200).json({ shop, bundles: bundlesResponse });
   } catch (error: any) {
     console.error("Error in getBundles API:", error?.message || error);
+    
+    // If it's an auth error, return 401 so frontend can trigger re-auth
+    if (error?.message?.includes('session') || error?.message?.includes('No shop')) {
+      return res.status(401).json({
+        error: "Authentication required",
+        message: "Please reinstall the app",
+      });
+    }
+    
     return res.status(500).json({
       error: "Failed to fetch bundles",
       message: error?.message || "Unknown error occurred",

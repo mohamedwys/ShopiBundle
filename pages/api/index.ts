@@ -11,7 +11,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       return res.send("No shop provided");
     }
 
-    console.log('Auth start for shop:', shop, 'embedded:', embedded);
+    console.log('Auth start for shop:', shop, 'embedded:', embedded, 'host:', host);
 
     // Handle embedded app redirect
     if (embedded === "1") {
@@ -28,11 +28,11 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     console.log('Starting OAuth for shop:', shop);
 
-    // Start OAuth - shopify.auth.begin handles state automatically
+    // Start OAuth - Fixed callback path to match your file structure
     await shopify.auth.begin({
       shop: shopify.utils.sanitizeShop(shop),
-      callbackPath: '/api/auth/tokens',
-      isOnline: false,
+      callbackPath: '/api/auth/callback', // Changed from /tokens to /callback
+      isOnline: false, // Start with offline for persistent access
       rawRequest: req,
       rawResponse: res,
     });
@@ -45,9 +45,10 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     if (shop && typeof shop === 'string') {
       try {
-        await prisma.active_stores.update({
+        await prisma.active_stores.upsert({
           where: { shop },
-          data: { isActive: false },
+          update: { isActive: false },
+          create: { shop, isActive: false },
         });
 
         await prisma.session.deleteMany({

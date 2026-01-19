@@ -6,9 +6,9 @@ import shopify from "@/utils/shopify";
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
-    console.log('Online token callback received');
+    console.log('Auth callback received');
 
-    // Exchange code for ONLINE access token
+    // Exchange code for OFFLINE access token first
     const callbackResponse = await shopify.auth.callback({
       rawRequest: req,
       rawResponse: res,
@@ -20,55 +20,93 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       throw new Error('No session returned from Shopify');
     }
 
-    console.log('Online token received, storing session');
+    console.log('Offline session received for shop:', session.shop);
 
-    // Store the online session
+    // Store the offline session
     await sessionHandler.storeSession(session);
 
     const { shop } = session;
 
-    // Create bundle definition (only needs to happen once)
+    // Create bundle definition
     try {
       const client = new shopify.clients.Graphql({ session });
       const bundleDefResult = await createBundleDefinition(client);
       console.log('Bundle definition created:', bundleDefResult);
+      
+      // Update store record
+      await prisma.active_stores.upsert({
+        where: { shop },
+        create: {
+          shop,
+          isActive: true,
+          scope: session.scope || '',
+        },
+        update: {
+          isActive: true,
+          scope: session.scope || '',
+          setupError: null,
+          lastError: null,
+        },
+      });
     } catch (defError) {
-      console.error('Bundle definition creation failed (non-critical):', defError);
+      console.error('Bundle definition creation failed:', defError);
       const errorMessage = defError instanceof Error ? defError.message : 'Unknown error';
       
-      await prisma.active_stores.update({
+      await prisma.active_stores.upsert({
         where: { shop },
-        data: { setupError: errorMessage }
+        create: {
+          shop,
+          isActive: true,
+          setupError: errorMessage,
+          scope: session.scope || '',
+        },
+        update: {
+          setupError: errorMessage,
+        },
       });
     }
 
-    // CRITICAL: Redirect to Shopify admin embedded app
-    const redirectUrl = `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
+    // Now initiate ONLINE token flow for user-specific operations
+    const host = req.query.host as string;
     
-    console.log('Redirecting to app:', redirectUrl);
+    console.log('Offline session complete, starting online session flow...');
     
-    return res.redirect(redirectUrl);
+    // Redirect to online auth
+    await shopify.auth.begin({
+      shop,
+      callbackPath: '/api/auth/online/callback',
+      isOnline: true,
+      rawRequest: req,
+      rawResponse: res,
+    });
 
   } catch (error) {
-    console.error('===> Online token callback error:', error);
+    console.error('===> Auth callback error:', error);
     
     const { shop } = req.query;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     if (shop && typeof shop === 'string') {
       try {
-        await prisma.active_stores.update({
+        await prisma.active_stores.upsert({
           where: { shop },
-          data: { 
+          create: {
+            shop,
+            isActive: false,
             lastError: errorMessage,
-            lastErrorAt: new Date()
+            lastErrorAt: new Date(),
+            scope: '',
+          },
+          update: {
+            lastError: errorMessage,
+            lastErrorAt: new Date(),
           },
         });
       } catch (dbError) {
-        console.error('Failed to update error:', dbError);
+        console.error('Failed to update error in DB:', dbError);
       }
       
-      // Restart from beginning
+      // Restart auth flow
       return res.redirect(`/api?shop=${shop}`);
     }
 
