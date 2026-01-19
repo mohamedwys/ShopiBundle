@@ -14,7 +14,45 @@ const sessionHandler = {
       }
 
       if (!session.accessToken) {
-        console.warn(`WARNING: Storing session without accessToken. ID: ${session.id}`);
+        throw new Error('Cannot store session: missing accessToken');
+      }
+
+      // CRITICAL: Validate token format and length
+      const tokenLength = session.accessToken.length;
+      const tokenPrefix = session.accessToken.substring(0, 6);
+
+      console.log('Token validation:', {
+        length: tokenLength,
+        prefix: tokenPrefix + '...',
+        isValid: tokenLength > 50 && (tokenPrefix.startsWith('shpat_') || tokenPrefix.startsWith('shpca_'))
+      });
+
+      // Valid Shopify access tokens are 100+ characters and start with shpat_ or shpca_
+      if (tokenLength < 50) {
+        throw new Error(
+          `Invalid access token: length is ${tokenLength} characters (expected 100+). ` +
+          `Token starts with: ${tokenPrefix}... This is NOT a valid Shopify access token.`
+        );
+      }
+
+      if (!tokenPrefix.startsWith('shpat_') && !tokenPrefix.startsWith('shpca_')) {
+        console.warn(
+          `⚠️ WARNING: Token doesn't start with expected prefix (shpat_ or shpca_). ` +
+          `Prefix: ${tokenPrefix}... Length: ${tokenLength}`
+        );
+      }
+
+      // CRITICAL: Delete any existing sessions for this shop before storing new one
+      // This ensures we don't update a corrupted session, we create a fresh one
+      const existingSession = await prisma.session.findUnique({
+        where: { id: session.id }
+      });
+
+      if (existingSession) {
+        console.log(`⚠️ Deleting existing session ${session.id} before storing new one`);
+        await prisma.session.delete({
+          where: { id: session.id }
+        });
       }
 
       // Serialize the entire session object to JSON
@@ -28,13 +66,9 @@ const sessionHandler = {
         expires: session.expires,
       };
 
-      await prisma.session.upsert({
-        where: { id: session.id },
-        update: {
-          shop: session.shop,
-          content: JSON.stringify(sessionData),
-        },
-        create: {
+      // Use create instead of upsert to ensure fresh session
+      await prisma.session.create({
+        data: {
           id: session.id,
           shop: session.shop,
           content: JSON.stringify(sessionData),
@@ -46,6 +80,8 @@ const sessionHandler = {
         shop: session.shop,
         isOnline: session.isOnline,
         hasAccessToken: !!session.accessToken,
+        tokenLength: session.accessToken.length,
+        tokenPrefix: session.accessToken.substring(0, 10) + '...',
       });
     } catch (error) {
       console.error('✗ Error storing session:', error);

@@ -32,12 +32,17 @@ const handler: NextApiHandler = async (req, res) => {
     let sessionContent;
     let hasToken = false;
     let tokenLength = 0;
+    let tokenPrefix = "";
+    let tokenSuffix = "";
     let sessionApiVersion = null;
 
     try {
       sessionContent = JSON.parse(sessionData.content);
       hasToken = !!sessionContent.accessToken;
-      tokenLength = sessionContent.accessToken?.length || 0;
+      const token = sessionContent.accessToken || "";
+      tokenLength = token.length;
+      tokenPrefix = token.substring(0, 6);
+      tokenSuffix = token.substring(token.length - 4);
 
       // Try to extract API version from session (if stored)
       sessionApiVersion = sessionContent.apiVersion || null;
@@ -69,6 +74,9 @@ const handler: NextApiHandler = async (req, res) => {
         shop: sessionData.shop,
         hasAccessToken: hasToken,
         tokenLength,
+        tokenPrefix: tokenPrefix ? tokenPrefix + "..." : null,
+        tokenSuffix: tokenSuffix ? "..." + tokenSuffix : null,
+        tokenLooksValid: tokenLength > 50 && (tokenPrefix.startsWith("shpat_") || tokenPrefix.startsWith("shpca_")),
         sessionApiVersion,
       },
 
@@ -97,6 +105,17 @@ const handler: NextApiHandler = async (req, res) => {
     if (!hasToken) {
       diagnosis.diagnosis.push("❌ Session has no access token");
       diagnosis.solution.push("Reinstall the app to generate new token");
+    } else if (tokenLength < 50) {
+      diagnosis.diagnosis.push(`❌ Access token is corrupted (${tokenLength} chars, should be 100+)`);
+      diagnosis.diagnosis.push(`   Token preview: ${tokenPrefix}...${tokenSuffix}`);
+      diagnosis.solution.push("1. Force delete session: /api/debug/force-delete-session?shop=" + shop + "&confirm=yes");
+      diagnosis.solution.push("2. Uninstall app from Shopify admin");
+      diagnosis.solution.push("3. Wait 30 seconds");
+      diagnosis.solution.push("4. Reinstall the app");
+    } else if (!tokenPrefix.startsWith("shpat_") && !tokenPrefix.startsWith("shpca_")) {
+      diagnosis.diagnosis.push("⚠️ Token doesn't have expected Shopify prefix");
+      diagnosis.diagnosis.push(`   Token starts with: ${tokenPrefix}...`);
+      diagnosis.solution.push("Token may be invalid. Try reinstalling.");
     }
 
     if (sessionApiVersion && sessionApiVersion !== apiVersion) {

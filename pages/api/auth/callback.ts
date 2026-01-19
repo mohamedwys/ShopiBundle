@@ -35,13 +35,31 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       console.warn('WARNING: Received online session instead of offline session');
     }
 
-    console.log('Session received:', {
+    // CRITICAL: Validate token before storing
+    const tokenLength = session.accessToken.length;
+    const tokenPrefix = session.accessToken.substring(0, 6);
+    const tokenSuffix = session.accessToken.substring(tokenLength - 4);
+
+    console.log('Session received from Shopify:', {
       id: session.id,
       shop: session.shop,
       isOnline: session.isOnline,
-      accessToken: session.accessToken ? `${session.accessToken.substring(0, 10)}...` : 'MISSING',
       scope: session.scope,
+      tokenInfo: {
+        length: tokenLength,
+        prefix: tokenPrefix + '...',
+        suffix: '...' + tokenSuffix,
+        looksValid: tokenLength > 50 && (tokenPrefix.startsWith('shpat_') || tokenPrefix.startsWith('shpca_')),
+      },
     });
+
+    // Validate token format
+    if (tokenLength < 50) {
+      throw new Error(
+        `Invalid token received from Shopify: length is ${tokenLength} characters (expected 100+). ` +
+        `This indicates an OAuth flow error. Token preview: ${tokenPrefix}...${tokenSuffix}`
+      );
+    }
 
     // Store the offline session
     await sessionHandler.storeSession(session);
