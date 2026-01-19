@@ -2,29 +2,55 @@
 
 ## Problems Identified
 
-1. **Configuration Mismatch**: `useOnlineTokens: true` in shopify.ts conflicted with offline OAuth flow
-2. **Session Storage Issues**: Sessions were being created but not properly validated
-3. **Session Retrieval Issues**: Poor error handling made debugging difficult
-4. **Cookie Handling**: Embedded apps tried to use cookies instead of session tokens
-5. **401 Unauthorized Errors**: GraphQL client couldn't authenticate due to missing/invalid sessions
+1. **CRITICAL - Missing Session Storage**: Shopify API library had no sessionStorage configured, so OAuth tokens weren't persisted
+2. **Configuration Mismatch**: `useOnlineTokens: true` in shopify.ts conflicted with offline OAuth flow
+3. **Session Storage Issues**: Sessions were being created but not properly validated
+4. **Session Retrieval Issues**: Poor error handling made debugging difficult
+5. **Cookie Handling**: Embedded apps tried to use cookies instead of session tokens
+6. **401 Unauthorized Errors**: GraphQL client couldn't authenticate due to missing/invalid sessions
 
 ## Fixes Applied
 
-### 1. Fixed Shopify API Configuration (utils/shopify.ts:20)
+### 1. 🔥 CRITICAL: Configured Session Storage (utils/shopify.ts)
+**Root Cause:** The Shopify API library had NO sessionStorage configured, so OAuth tokens were never being persisted!
+
 **Before:**
 ```javascript
-useOnlineTokens: true,
+const shopify = shopifyApi({
+  // ... config
+  useOnlineTokens: true,  // WRONG!
+  // sessionStorage: MISSING! ❌
+});
 ```
 
 **After:**
 ```javascript
-useOnlineTokens: false,
+// Configure custom session storage adapter
+const customSessionStorage: SessionStorage = {
+  async storeSession(session: Session): Promise<boolean> {
+    await sessionHandler.storeSession(session);
+    return true;
+  },
+  async loadSession(id: string): Promise<Session | undefined> {
+    return await sessionHandler.loadSession(id);
+  },
+  // ... other required methods
+};
+
+const shopify = shopifyApi({
+  // ... config
+  useOnlineTokens: false,  // FIXED! ✅
+  sessionStorage: customSessionStorage,  // ADDED! ✅
+});
 ```
 
 **Impact:**
+- **CRITICAL:** Shopify API library now knows how to persist sessions to database
+- Without this, OAuth callbacks weren't saving access tokens properly
 - Enables proper offline token handling for persistent API access
 - Fixes cookie issues in embedded apps
 - Aligns configuration with OAuth flow that requests offline sessions
+- This was the PRIMARY cause of 401 Unauthorized errors
 
 ### 2. Enhanced OAuth Callback (pages/api/auth/callback.ts:24-60)
 **Added:**
@@ -89,6 +115,19 @@ useOnlineTokens: false,
 - Shows if wrong session type (online vs offline) was stored
 - Helps identify if reinstall is needed
 
+### 7. Created Clear Session Endpoint (pages/api/clear-session.ts)
+**New file** that provides:
+- Deletes all sessions for a specified shop
+- Clears active_stores record to trigger fresh setup
+- Returns reinstall URL for convenience
+- Safe way to force fresh OAuth flow
+
+**Impact:**
+- Easy way to clear old/corrupted sessions
+- Forces clean slate for testing fixes
+- Essential for clearing sessions created with old configuration
+- Usage: `/api/clear-session?shop=your-store.myshopify.com`
+
 ## Session ID Format
 
 Offline sessions use the format: `offline_{shop}`
@@ -101,13 +140,29 @@ The previous error message mentioned `galactiva.myshopify.com_122010698009`, whi
 
 ## Testing the Fixes
 
-### 1. Test OAuth Flow
+### 🚨 IMPORTANT: Clear Old Sessions First!
+
+**The existing session in your database was created with the OLD configuration (no sessionStorage).**
+You MUST clear it before testing:
+
+Visit: `https://shopi-bundle.vercel.app/api/clear-session?shop=galactiva.myshopify.com`
+
+Expected response:
+```json
+{
+  "success": true,
+  "deletedSessionCount": 1,
+  "message": "All sessions cleared for galactiva.myshopify.com. Please reinstall the app."
+}
+```
+
+### 1. Test OAuth Flow (Creates Fresh Session with NEW Config)
 Visit: `https://shopi-bundle.vercel.app/api?shop=galactiva.myshopify.com`
 
 Expected outcome:
 - OAuth flow completes
-- Offline session stored with format `offline_galactiva.myshopify.com`
-- Session has valid accessToken
+- **NEW** offline session stored with format `offline_galactiva.myshopify.com`
+- Session has valid accessToken from Shopify with correct scopes
 - Console logs show "✓ Session stored successfully" and "✓ Session verified in database with accessToken"
 
 ### 2. Test Session Status
@@ -151,28 +206,36 @@ Expected outcome:
 - Returns bundle data
 - No 401 Unauthorized errors
 
-## Files Modified
+## Files Modified/Created
 
-1. `utils/shopify.ts` - Fixed useOnlineTokens configuration
-2. `pages/api/auth/callback.ts` - Added session validation
+1. `utils/shopify.ts` - **🔥 CRITICAL:** Added sessionStorage configuration + fixed useOnlineTokens
+2. `pages/api/auth/callback.ts` - Added session validation and verification
 3. `utils/sessionHandler.ts` - Enhanced logging and validation
 4. `utils/clientProvider.ts` - Better error handling and logging
 5. `pages/api/test-bundles.ts` - Enhanced diagnostics
-6. `pages/api/debug-session.ts` - New diagnostic endpoint
+6. `pages/api/debug-session.ts` - **NEW:** Diagnostic endpoint
+7. `pages/api/clear-session.ts` - **NEW:** Session cleanup endpoint
+8. `OAUTH_FIXES_SUMMARY.md` - **NEW:** This documentation
 
 ## Next Steps
 
-1. **Reinstall the app** on galactiva.myshopify.com to create a fresh offline session with the new configuration
-2. **Test the OAuth flow** to ensure offline session is created properly
-3. **Test API endpoints** to ensure they can access bundles without 401 errors
-4. **Monitor logs** for any remaining session issues
+### 🚨 CRITICAL: The existing session was created with the broken configuration!
+
+1. **Clear old session** - Visit `/api/clear-session?shop=galactiva.myshopify.com` (REQUIRED!)
+2. **Reinstall the app** - Visit `/api?shop=galactiva.myshopify.com` to create fresh session with NEW config
+3. **Verify session** - Check `/api/debug-session?shop=galactiva.myshopify.com` shows valid accessToken
+4. **Test bundles** - Visit `/api/test-bundles` should return bundles without 401 errors
+5. **Monitor logs** - Ensure session operations log success messages
 
 ## Prevention
 
 To prevent similar issues in the future:
 
-1. Always use `useOnlineTokens: false` for apps that need persistent API access
-2. Always validate sessions have accessToken before using them
-3. Use comprehensive logging to make issues visible immediately
-4. Use the debug endpoints to diagnose session issues quickly
-5. Ensure OAuth flow configuration matches app requirements (online vs offline tokens)
+1. **ALWAYS configure sessionStorage** when initializing @shopify/shopify-api - without it, tokens won't persist!
+2. Always use `useOnlineTokens: false` for apps that need persistent API access
+3. Always validate sessions have accessToken before using them
+4. Use comprehensive logging to make issues visible immediately
+5. Use the debug endpoints to diagnose session issues quickly
+6. Ensure OAuth flow configuration matches app requirements (online vs offline tokens)
+7. Test OAuth flow thoroughly after any configuration changes
+8. Clear old sessions when deploying configuration fixes
