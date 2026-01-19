@@ -1,6 +1,6 @@
-# TypeScript Compilation Error - FIXED ✅
+# TypeScript Compilation Errors - ALL FIXED ✅
 
-## Issue
+## Issue 1: ClientProvider Type Error
 
 Build failed with TypeScript error:
 ```
@@ -109,6 +109,68 @@ The interface clearly shows that the method expects an object with optional prop
 
 ---
 
-**Status:** ✅ FIXED and VERIFIED
+---
+
+## Issue 2: ResourcePicker Missing Filter Property
+
+Build failed with TypeScript error:
+```
+./pages/edit_bundle.tsx:145:66
+Type error: Argument of type '{ type: string; multiple: true; action: string; }' is not assignable to parameter of type '{ type: string; multiple: boolean; action: string; filter: { variants: boolean; }; }'.
+Property 'filter' is missing in type '{ type: string; multiple: true; action: string; }' but required in type '{ type: string; multiple: boolean; action: string; filter: { variants: boolean; }; }'.
+```
+
+### Root Cause
+
+The Shopify App Bridge `resourcePicker` API requires a `filter` property with a `variants` boolean field.
+
+**Incorrect usage:**
+```typescript
+const selectedProducts = await window.shopify.resourcePicker({
+  type: "product",
+  multiple: true,
+  action: "select",
+  // ❌ Missing required filter property
+});
+```
+
+**Correct usage:**
+```typescript
+const selectedProducts = await window.shopify.resourcePicker({
+  type: "product",
+  multiple: true,
+  action: "select",
+  filter: {
+    variants: true,  // ✅ Required property added
+  },
+});
+```
+
+### Fix Applied
+
+**File:** `pages/edit_bundle.tsx`
+
+**Line 145-152:** Added missing `filter` property to match the format used in `create_bundle.tsx`.
+
+---
+
+## Summary of All Fixes
+
+✅ **Fixed 2 TypeScript compilation errors:**
+
+1. **Proxy Route API** (`bundles-for-product.ts`) - Fixed `clientProvider.offline.graphqlClient` call
+2. **Edit Bundle Page** (`edit_bundle.tsx`) - Added required `filter` property to `resourcePicker`
+
+## Commits
+
+- **Fix Commit 1:** `7596196` - Fixed clientProvider type error
+- **Fix Commit 2:** `c12f729` - Fixed resourcePicker missing property
+- **Documentation:** `78f624f` - Added fix documentation
+
+**Branch:** `claude/audit-shopify-bundle-app-PYAQO`
+
+---
+
+**Status:** ✅ ALL ISSUES FIXED and VERIFIED
 **Date:** 2026-01-19
 **Build Status:** Ready for compilation
