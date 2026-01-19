@@ -28,6 +28,7 @@ const handler = async (
 
   try {
     // Get Shopify GraphQL client with online session
+    // The verifyRequest middleware should have already validated the session token
     const { client, shop } = await clientProvider.graphqlClient({
       req,
       res,
@@ -39,14 +40,14 @@ const handler = async (
     const bundlesResponse = await getBundles(
       client,
       after ?? true,
-      cursor ?? undefined
+      cursor
     );
 
     return res.status(200).json({ shop, bundles: bundlesResponse });
   } catch (error: any) {
     console.error("Error in getBundles API:", error?.message || error);
-    return res.status(403).json({
-      error: "No session found or invalid session",
+    return res.status(500).json({
+      error: "Failed to fetch bundles",
       message: error?.message || "Unknown error occurred",
     });
   }

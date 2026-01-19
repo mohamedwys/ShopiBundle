@@ -1,5 +1,7 @@
 import { Page, Layout, Card, Text, Button, Spinner, BlockStack, InlineStack } from "@shopify/polaris";
 import { useEffect, useState } from "react";
+import { useAppBridge } from "@/components/providers/AppBridgeProvider";
+import { getSessionToken } from "@shopify/app-bridge/utilities";
 
 interface Bundle {
   id: string;
@@ -16,15 +18,29 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const { app } = useAppBridge();
 
   const fetchBundles = async () => {
     setLoading(true);
     setError(null);
+    
+    if (!app) {
+      setError("App Bridge not initialized");
+      setLoading(false);
+      return;
+    }
+
     try {
+      // Get session token from App Bridge
+      const token = await getSessionToken(app);
+      
       const response = await fetch("/api/getBundles", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ after: null, cursor: null }),
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ after: true, cursor: null }),
       });
 
       if (!response.ok) {
@@ -35,7 +51,13 @@ export default function Home() {
       const data: BundlesApiResponse = await response.json();
       
       // Extract bundles from the response (adjust based on your actual data structure)
-      const bundlesData = Array.isArray(data.bundles) ? data.bundles : [];
+      const bundlesData = Array.isArray(data.bundles?.edges) 
+        ? data.bundles.edges.map((edge: any) => ({
+            id: edge.node.id,
+            name: edge.node.fields.find((f: any) => f.key === "name")?.value || "Unnamed Bundle",
+            discount: edge.node.fields.find((f: any) => f.key === "discount")?.value || "0%",
+          }))
+        : [];
       setBundles(bundlesData);
     } catch (err: any) {
       console.error("Error fetching bundles:", err);
@@ -46,8 +68,10 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetchBundles();
-  }, []);
+    if (app) {
+      fetchBundles();
+    }
+  }, [app]);
 
   if (loading) {
     return (
