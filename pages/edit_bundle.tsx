@@ -1,4 +1,5 @@
 import isShopAvailable from "@/utils/middleware/isShopAvailable";
+import { Product } from "@shopify/app-bridge/actions/ResourcePicker";
 import {
   Button,
   DataTable,
@@ -142,14 +143,14 @@ const EditBundlePage: NextPage = () => {
 
   // Open product picker to change products
   async function handleChangeProducts() {
-    const selectedProducts = await window.shopify.resourcePicker({
+    const selectedProducts = await (window.shopify.resourcePicker({
       type: "product",
       multiple: true,
       action: "select",
       filter: {
         variants: true,
       },
-    });
+    }) as Promise<Product[]>);
 
     if (selectedProducts && selectedProducts.length > 0) {
       const newProducts: ProductData[] = [];
