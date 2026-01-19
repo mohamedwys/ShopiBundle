@@ -1,12 +1,21 @@
-import { ApiVersion, DeliveryMethod, shopifyApi, Session, SessionStorage } from "@shopify/shopify-api";
+import { ApiVersion, DeliveryMethod, shopifyApi, Session } from "@shopify/shopify-api";
 import "@shopify/shopify-api/adapters/node";
 import appUninstallHandler from "./webhooks/app_uninstalled";
 import sessionHandler from "./sessionHandler";
 
 const isDev = process.env.NODE_ENV === "development";
 
+// Define session storage interface (SessionStorage not exported from @shopify/shopify-api)
+interface SessionStorageInterface {
+  storeSession(session: Session): Promise<boolean>;
+  loadSession(id: string): Promise<Session | undefined>;
+  deleteSession(id: string): Promise<boolean>;
+  deleteSessions(ids: string[]): Promise<boolean>;
+  findSessionsByShop(shop: string): Promise<Session[]>;
+}
+
 // Create custom session storage that uses our sessionHandler
-const customSessionStorage: SessionStorage = {
+const customSessionStorage: SessionStorageInterface = {
   async storeSession(session: Session): Promise<boolean> {
     try {
       await sessionHandler.storeSession(session);
