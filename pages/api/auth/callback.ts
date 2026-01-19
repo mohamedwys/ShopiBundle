@@ -38,17 +38,15 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       const bundleDefResult = await createBundleDefinition(client);
       console.log('Bundle definition created:', bundleDefResult);
       
-      // Update store record
+      // Update store record - removed scope field
       await prisma.active_stores.upsert({
         where: { shop },
         create: {
           shop,
           isActive: true,
-          scope: session.scope || '',
         },
         update: {
           isActive: true,
-          scope: session.scope || '',
           setupError: null,
           lastError: null,
         },
@@ -64,7 +62,6 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           shop,
           isActive: true,
           setupError: errorMessage,
-          scope: session.scope || '',
         },
         update: {
           setupError: errorMessage,
@@ -99,7 +96,6 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
             isActive: false,
             lastError: errorMessage,
             lastErrorAt: new Date(),
-            scope: '',
           },
           update: {
             lastError: errorMessage,
