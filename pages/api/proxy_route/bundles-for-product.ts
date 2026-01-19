@@ -20,9 +20,9 @@ const handler: NextApiHandler = async (req, res) => {
     }
 
     // Get offline client for the shop
-    const { client } = await clientProvider.offline.graphqlClient(
-      shop as string
-    );
+    const { client } = await clientProvider.offline.graphqlClient({
+      shop: shop as string,
+    });
 
     // Query all bundles and filter by product
     const query = `
