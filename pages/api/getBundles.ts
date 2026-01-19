@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import withMiddleware from "@/utils/middleware/withMiddleware";
 import clientProvider from "@/utils/clientProvider";
 import { getBundles } from "@/utils/shopifyQueries";
-import shopify from "@/utils/shopify";
 
 interface BundlesRequestBody {
   after?: boolean;
@@ -27,38 +27,35 @@ const handler = async (
   }
 
   try {
-    // Extract shop from the authorization token or query
-    const authHeader = req.headers.authorization;
-    let shop: string | undefined;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.replace('Bearer ', '');
-      
-      try {
-        // Decode the session token to get shop
-        const payload = await shopify.session.decodeSessionToken(token);
-        shop = payload.dest.replace('https://', '');
-      } catch (tokenError) {
-        console.error('Token decode error:', tokenError);
-      }
-    }
-
-    // Fallback to query parameter
-    if (!shop) {
-      shop = req.query.shop as string;
-    }
-
-    if (!shop) {
-      return res.status(400).json({
-        error: "Missing shop parameter",
-        message: "Shop domain is required",
+    // Try to get online session first, fallback to offline if not available
+    let client, shop;
+    
+    try {
+      const result = await clientProvider.graphqlClient({
+        req,
+        res,
+        isOnline: true,
       });
+      client = result.client;
+      shop = result.shop;
+    } catch (onlineError) {
+      console.log('Online session not found, trying offline session...');
+      
+      // Fallback to offline session
+      // Extract shop from session or request
+      const shopDomain = req.headers['x-shop-domain'] as string || 
+                         req.query.shop as string;
+      
+      if (!shopDomain) {
+        throw new Error('No shop domain found in request');
+      }
+      
+      const result = await clientProvider.offline.graphqlClient({
+        shop: shopDomain,
+      });
+      client = result.client;
+      shop = result.shop;
     }
-
-    console.log('Fetching bundles for shop:', shop);
-
-    // Use offline session (persistent access token)
-    const { client } = await clientProvider.offline.graphqlClient({ shop });
 
     const { after, cursor } = req.body as BundlesRequestBody;
 
@@ -72,11 +69,11 @@ const handler = async (
   } catch (error: any) {
     console.error("Error in getBundles API:", error?.message || error);
     
-    // Provide specific error messages
-    if (error?.message?.includes('session') || error?.message?.includes('No offline session')) {
+    // If it's an auth error, return 401 so frontend can trigger re-auth
+    if (error?.message?.includes('session') || error?.message?.includes('No shop')) {
       return res.status(401).json({
         error: "Authentication required",
-        message: "Please reinstall the app to create a new session",
+        message: "Please reinstall the app",
       });
     }
     
@@ -93,5 +90,4 @@ export const config = {
   },
 };
 
-// Remove middleware temporarily to debug
-export default handler;
+export default withMiddleware("verifyRequest")(handler);

@@ -2,7 +2,7 @@ import { Page, Layout, Card, Text, Button, Spinner, BlockStack, InlineStack } fr
 import { useEffect, useState } from "react";
 import { useAppBridge } from "@/components/providers/AppBridgeProvider";
 import { getSessionToken } from "@shopify/app-bridge/utilities";
-import { useRouter } from "next/router";
+import { Redirect } from "@shopify/app-bridge/actions";
 
 interface Bundle {
   id: string;
@@ -20,15 +20,24 @@ export default function Home() {
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [error, setError] = useState<string | null>(null);
   const { app } = useAppBridge();
-  const router = useRouter();
-  const shop = router.query.shop as string;
+
+  const handleAuthError = () => {
+    if (app) {
+      // Redirect to auth if session is missing
+      const redirect = Redirect.create(app);
+      redirect.dispatch(Redirect.Action.REMOTE, {
+        url: `/api/auth?shop=${new URLSearchParams(window.location.search).get('shop')}`,
+        newContext: false,
+      });
+    }
+  };
 
   const fetchBundles = async () => {
     setLoading(true);
     setError(null);
     
-    if (!app || !shop) {
-      setError("App not initialized properly");
+    if (!app) {
+      setError("App Bridge not initialized");
       setLoading(false);
       return;
     }
@@ -43,26 +52,22 @@ export default function Home() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ 
-          after: true, 
-          cursor: null,
-        }),
+        body: JSON.stringify({ after: true, cursor: null }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
         
-        // If it's an auth error, provide clear instructions
+        // If it's an auth error, redirect to auth
         if (response.status === 401 || response.status === 403) {
-          throw new Error("Session expired. Please reinstall the app from your Shopify admin.");
+          handleAuthError();
+          return;
         }
         
         throw new Error(errorData.error || errorData.message || "Failed to load bundles");
       }
 
       const data: BundlesApiResponse = await response.json();
-      
-      console.log('Bundles data:', data);
       
       // Extract bundles from the response
       const bundlesData = Array.isArray(data.bundles?.edges) 
@@ -82,10 +87,10 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (app && shop) {
+    if (app) {
       fetchBundles();
     }
-  }, [app, shop]);
+  }, [app]);
 
   if (loading) {
     return (
@@ -95,7 +100,6 @@ export default function Home() {
             <Card>
               <div style={{ textAlign: "center", padding: "20px" }}>
                 <Spinner size="large" />
-                <Text as="p" variant="bodyMd">Loading bundles...</Text>
               </div>
             </Card>
           </Layout.Section>
@@ -119,6 +123,7 @@ export default function Home() {
                 </Text>
                 <InlineStack align="start" gap="200">
                   <Button onClick={fetchBundles}>Retry</Button>
+                  <Button onClick={handleAuthError}>Reinstall App</Button>
                 </InlineStack>
               </BlockStack>
             </Card>
