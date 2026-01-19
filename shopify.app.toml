@@ -5,7 +5,7 @@ application_url = "https://shopi-bundle.vercel.app"
 embedded = true
 
 [webhooks]
-api_version = "2026-04"
+api_version = "2025-10"
 
 [access_scopes]
 scopes = "write_metaobjects,read_metaobjects,write_metaobject_definitions,read_products,write_discounts,read_orders" 
