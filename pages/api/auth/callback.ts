@@ -6,9 +6,9 @@ import shopify from "@/utils/shopify";
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
-    console.log('Auth callback received');
+    console.log('Auth callback received, query params:', req.query);
 
-    // Exchange code for OFFLINE access token first
+    // Exchange code for OFFLINE access token
     const callbackResponse = await shopify.auth.callback({
       rawRequest: req,
       rawResponse: res,
@@ -20,10 +20,15 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       throw new Error('No session returned from Shopify');
     }
 
-    console.log('Offline session received for shop:', session.shop);
+    console.log('Offline session created:', {
+      id: session.id,
+      shop: session.shop,
+      isOnline: session.isOnline,
+    });
 
     // Store the offline session
     await sessionHandler.storeSession(session);
+    console.log('Offline session stored successfully');
 
     const { shop } = session;
 
@@ -48,8 +53,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           lastError: null,
         },
       });
+      console.log('Store record updated');
     } catch (defError) {
-      console.error('Bundle definition creation failed:', defError);
+      console.error('Bundle definition creation failed (non-critical):', defError);
       const errorMessage = defError instanceof Error ? defError.message : 'Unknown error';
       
       await prisma.active_stores.upsert({
@@ -66,19 +72,17 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       });
     }
 
-    // Now initiate ONLINE token flow for user-specific operations
+    // Get host from query for redirect
     const host = req.query.host as string;
     
-    console.log('Offline session complete, starting online session flow...');
+    // Redirect directly to the app
+    const redirectUrl = host 
+      ? `/?shop=${shop}&host=${host}`
+      : `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
     
-    // Redirect to online auth
-    await shopify.auth.begin({
-      shop,
-      callbackPath: '/api/auth/online/callback',
-      isOnline: true,
-      rawRequest: req,
-      rawResponse: res,
-    });
+    console.log('Auth complete! Redirecting to:', redirectUrl);
+    
+    return res.redirect(redirectUrl);
 
   } catch (error) {
     console.error('===> Auth callback error:', error);
@@ -100,6 +104,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           update: {
             lastError: errorMessage,
             lastErrorAt: new Date(),
+            isActive: false,
           },
         });
       } catch (dbError) {

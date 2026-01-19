@@ -11,28 +11,27 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       return res.send("No shop provided");
     }
 
-    console.log('Auth start for shop:', shop, 'embedded:', embedded, 'host:', host);
+    const sanitizedShop = shopify.utils.sanitizeShop(shop);
+    console.log('Auth start for shop:', sanitizedShop, 'embedded:', embedded, 'host:', host);
 
     // Handle embedded app redirect
-    if (embedded === "1") {
-      const sanitizedShop = shopify.utils.sanitizeShop(shop);
+    if (embedded === "1" && host) {
       const queryParams = new URLSearchParams({
         shop: sanitizedShop,
         host: typeof host === 'string' ? host : '',
-        redirectUri: `/api?shop=${sanitizedShop}&host=${host}`,
       }).toString();
 
       console.log('Redirecting to exitframe');
       return res.redirect(`/exitframe?${queryParams}`);
     }
 
-    console.log('Starting OAuth for shop:', shop);
+    console.log('Starting OAuth for shop:', sanitizedShop);
 
-    // Start OAuth - Fixed callback path to match your file structure
+    // Start OAuth with proper configuration
     await shopify.auth.begin({
-      shop: shopify.utils.sanitizeShop(shop),
-      callbackPath: '/api/auth/callback', // Changed from /tokens to /callback
-      isOnline: false, // Start with offline for persistent access
+      shop: sanitizedShop,
+      callbackPath: '/api/auth/callback',
+      isOnline: false,
       rawRequest: req,
       rawResponse: res,
     });
@@ -44,26 +43,30 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     const error = e as Error;
 
     if (shop && typeof shop === 'string') {
+      const sanitizedShop = shopify.utils.sanitizeShop(shop);
       try {
         await prisma.active_stores.upsert({
-          where: { shop },
-          update: { isActive: false },
-          create: { shop, isActive: false },
+          where: { shop: sanitizedShop },
+          update: { 
+            isActive: false,
+            lastError: error.message,
+            lastErrorAt: new Date(),
+          },
+          create: { 
+            shop: sanitizedShop, 
+            isActive: false,
+            lastError: error.message,
+            lastErrorAt: new Date(),
+          },
         });
 
-        await prisma.session.deleteMany({
-          where: { shop },
-        });
-
-        console.log('Cleared sessions for shop:', shop);
+        console.log('Cleared sessions for shop:', sanitizedShop);
       } catch (dbError) {
-        console.error('Error clearing sessions:', dbError);
+        console.error('Error updating DB:', dbError);
       }
-      
-      res.redirect(`/api?shop=${shop}`);
-    } else {
-      res.status(500).send(error.message);
     }
+    
+    res.status(500).send(error.message);
   }
 };
 
