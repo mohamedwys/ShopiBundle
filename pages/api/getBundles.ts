@@ -4,7 +4,7 @@ import clientProvider from "@/utils/clientProvider";
 import { getBundles } from "@/utils/shopifyQueries";
 
 interface BundlesRequestBody {
-  after?: string;
+  after?: boolean;
   cursor?: string;
 }
 
@@ -36,7 +36,11 @@ const handler = async (
 
     const { after, cursor } = req.body as BundlesRequestBody;
 
-    const bundlesResponse = await getBundles(client, after, cursor);
+    const bundlesResponse = await getBundles(
+      client,
+      after ?? true,
+      cursor ?? undefined
+    );
 
     return res.status(200).json({ shop, bundles: bundlesResponse });
   } catch (error: any) {
@@ -54,4 +58,4 @@ export const config = {
   },
 };
 
-export default withMiddleware("verifyRequest")(handler);
+export default withMiddleware(handler);
