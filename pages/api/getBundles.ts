@@ -58,4 +58,4 @@ export const config = {
   },
 };
 
-export default withMiddleware(handler);
+export default withMiddleware("verifyRequest")(handler);
