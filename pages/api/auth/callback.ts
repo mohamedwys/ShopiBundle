@@ -16,28 +16,48 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     });
 
     const { session } = callbackResponse;
-    
+
     if (!session) {
       throw new Error('No session returned from Shopify');
+    }
+
+    // Validate session structure
+    if (!session.accessToken) {
+      throw new Error('Session is missing accessToken - OAuth flow failed');
+    }
+
+    if (!session.shop) {
+      throw new Error('Session is missing shop domain');
+    }
+
+    // Verify this is an offline session
+    if (session.isOnline) {
+      console.warn('WARNING: Received online session instead of offline session');
     }
 
     console.log('Session received:', {
       id: session.id,
       shop: session.shop,
       isOnline: session.isOnline,
-      accessToken: session.accessToken ? 'EXISTS' : 'MISSING',
+      accessToken: session.accessToken ? `${session.accessToken.substring(0, 10)}...` : 'MISSING',
+      scope: session.scope,
     });
 
     // Store the offline session
     await sessionHandler.storeSession(session);
     console.log('✓ Session stored with ID:', session.id);
 
-    // Verify session was stored
+    // Verify session was stored and can be retrieved
     const storedSession = await sessionHandler.loadSession(session.id);
     if (!storedSession) {
       throw new Error(`Session was not stored correctly. ID: ${session.id}`);
     }
-    console.log('✓ Session verified in database');
+
+    if (!storedSession.accessToken) {
+      throw new Error(`Stored session is missing accessToken. ID: ${session.id}`);
+    }
+
+    console.log('✓ Session verified in database with accessToken');
 
     const { shop } = session;
 

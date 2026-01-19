@@ -11,10 +11,23 @@ type ClientParams = {
 
 const fetchSession = async ({ req, res, isOnline, shop }: ClientParams): Promise<Session> => {
   if (shop && !req) {
-    // Offline session
+    // Offline session lookup by shop domain
     const sessionId = shopify.session.getOfflineId(shop);
+    console.log(`Fetching offline session for shop: ${shop}, sessionId: ${sessionId}`);
+
     const session = await sessionHandler.loadSession(sessionId);
-    if (!session) throw new Error(`No offline session found for shop: ${shop}`);
+
+    if (!session) {
+      console.error(`✗ No offline session found for shop: ${shop}, expected sessionId: ${sessionId}`);
+      throw new Error(`No offline session found for shop: ${shop}. Please reinstall the app.`);
+    }
+
+    if (!session.accessToken) {
+      console.error(`✗ Offline session exists but has no accessToken for shop: ${shop}`);
+      throw new Error(`Session for ${shop} is missing accessToken. Please reinstall the app.`);
+    }
+
+    console.log(`✓ Offline session found for shop: ${shop}`);
     return session;
   }
 
@@ -24,10 +37,20 @@ const fetchSession = async ({ req, res, isOnline, shop }: ClientParams): Promise
     rawResponse: res,
   });
 
-  if (!sessionId) throw new Error("No session ID found");
+  if (!sessionId) {
+    console.error('✗ No session ID found in request');
+    throw new Error("No session ID found");
+  }
 
+  console.log(`Fetching session with ID: ${sessionId}`);
   const session = await sessionHandler.loadSession(sessionId);
-  if (!session) throw new Error(`No session found for id: ${sessionId}`);
+
+  if (!session) {
+    console.error(`✗ No session found for id: ${sessionId}`);
+    throw new Error(`No session found for id: ${sessionId}`);
+  }
+
+  console.log(`✓ Session found for id: ${sessionId}`);
   return session;
 };
 

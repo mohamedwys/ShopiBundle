@@ -15,8 +15,9 @@ const shopify = shopifyApi({
   isEmbeddedApp: true,
   logger: { level: isDev ? 0 : 0 },
 
-  // CRITICAL: Use session tokens instead of cookies for embedded apps
-  useOnlineTokens: true,
+  // CRITICAL: Use offline tokens for persistent API access
+  // Online tokens expire and are user-specific, offline tokens are shop-specific and permanent
+  useOnlineTokens: false,
 
   // Future flags for better compatibility
   billing: undefined,

@@ -4,6 +4,19 @@ import prisma from './prisma';
 const sessionHandler = {
   async storeSession(session: Session): Promise<void> {
     try {
+      // Validate session before storing
+      if (!session.id) {
+        throw new Error('Cannot store session: missing session ID');
+      }
+
+      if (!session.shop) {
+        throw new Error('Cannot store session: missing shop domain');
+      }
+
+      if (!session.accessToken) {
+        console.warn(`WARNING: Storing session without accessToken. ID: ${session.id}`);
+      }
+
       // Serialize the entire session object to JSON
       const sessionData = {
         id: session.id,
@@ -28,28 +41,39 @@ const sessionHandler = {
         },
       });
 
-      console.log('Session stored successfully:', session.id);
+      console.log('✓ Session stored successfully:', {
+        id: session.id,
+        shop: session.shop,
+        isOnline: session.isOnline,
+        hasAccessToken: !!session.accessToken,
+      });
     } catch (error) {
-      console.error('Error storing session:', error);
+      console.error('✗ Error storing session:', error);
       throw error;
     }
   },
 
   async loadSession(id: string): Promise<Session | undefined> {
     try {
+      console.log('Loading session with ID:', id);
+
       const record = await prisma.session.findUnique({
         where: { id }
       });
 
       if (!record || !record.content) {
-        console.log('No session found for id:', id);
+        console.warn('✗ No session found for id:', id);
         return undefined;
       }
 
       // Deserialize the session from JSON
       const sessionData = JSON.parse(record.content);
 
-      return new Session({
+      if (!sessionData.accessToken) {
+        console.warn(`✗ Session ${id} has no accessToken`);
+      }
+
+      const session = new Session({
         id: sessionData.id,
         shop: sessionData.shop,
         state: sessionData.state,
@@ -58,8 +82,17 @@ const sessionHandler = {
         scope: sessionData.scope || undefined,
         expires: sessionData.expires ? new Date(sessionData.expires) : undefined,
       });
+
+      console.log('✓ Session loaded successfully:', {
+        id: session.id,
+        shop: session.shop,
+        isOnline: session.isOnline,
+        hasAccessToken: !!session.accessToken,
+      });
+
+      return session;
     } catch (error) {
-      console.error('Error loading session:', error);
+      console.error('✗ Error loading session:', error);
       return undefined;
     }
   },
