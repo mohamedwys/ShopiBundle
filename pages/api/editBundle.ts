@@ -19,7 +19,7 @@ const handler: NextApiHandler = async (req, res) => {
 
   try {
     // update bundle data
-    const data: EditedBundleData = JSON.parse(req.body);
+    const data: any = JSON.parse(req.body);
     const resposne: boolean = await editBundle(client, data);
     if (resposne) {
       // get discount Id
@@ -28,17 +28,47 @@ const handler: NextApiHandler = async (req, res) => {
           bundleId: data.id,
         },
       });
-      // update discount percentage in Discounts
-      await discountUpdate(client, discountData.discountId, data.discount);
 
-      await prisma.bundle_discount_id.update({
-        where: {
-          bundleId: data.id,
-        },
-        data: {
-          bundleName: data.bundleName,
-        },
-      });
+      // If products changed, update the discount with new products
+      if (data.products && data.products.length > 0) {
+        const { discountDelete, discountCreate } = await import(
+          "@/utils/shopifyQueries"
+        );
+
+        // Delete old discount
+        await discountDelete(client, [discountData.discountId]);
+
+        // Create new discount with updated products
+        const newDiscountId = await discountCreate(client, {
+          title: `Bundle Discount - ${data.bundleName}`,
+          discount: data.discount,
+          products: data.products,
+          minProducts: String(data.products.length),
+        });
+
+        // Update database with new discount ID
+        await prisma.bundle_discount_id.update({
+          where: {
+            bundleId: data.id,
+          },
+          data: {
+            bundleName: data.bundleName,
+            discountId: newDiscountId,
+          },
+        });
+      } else {
+        // Only update discount percentage if products didn't change
+        await discountUpdate(client, discountData.discountId, data.discount);
+
+        await prisma.bundle_discount_id.update({
+          where: {
+            bundleId: data.id,
+          },
+          data: {
+            bundleName: data.bundleName,
+          },
+        });
+      }
 
       return res.status(200).send("message: Bundle saved successfully");
     }

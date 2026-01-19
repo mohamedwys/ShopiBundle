@@ -24,7 +24,7 @@ model session {
   shop    String?
 }
 
-// Automatic bundle generation data
+// Automatic bundle generation data (DEPRECATED - use auto_bundle_rules)
 model auto_bundle_data {
   shop        String   @id
   collections String[] //MySQL requires adding @db.Text
@@ -33,6 +33,24 @@ model auto_bundle_data {
   maxPrice    String
   minProducts String
   discount    String
+}
+
+// New: Multiple auto bundle rules support
+model auto_bundle_rules {
+  id          String   @id @default(cuid())
+  shop        String
+  name        String   // Rule name for identification
+  collections String[] // Selected collection names
+  tags        String[] // Selected product tags
+  minPrice    String
+  maxPrice    String
+  minProducts String
+  discount    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([shop])
 }
 
 // Discount id for the bundle

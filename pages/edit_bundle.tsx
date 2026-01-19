@@ -69,6 +69,7 @@ const EditBundlePage: NextPage = () => {
   const [rows, setRows] = useState<string[][]>([]);
   const [loading, setLoading] = useState(false);
   const [gettingBundle, setGettingBundle] = useState(false);
+  const [productsChanged, setProductsChanged] = useState(false);
 
   // success/error toast messages
   const [successToastActive, setSuccessToastActive] = useState(false);
@@ -139,16 +140,57 @@ const EditBundlePage: NextPage = () => {
     }
   }, [id]);
 
+  // Open product picker to change products
+  async function handleChangeProducts() {
+    const selectedProducts = await window.shopify.resourcePicker({
+      type: "product",
+      multiple: true,
+      action: "select",
+    });
+
+    if (selectedProducts && selectedProducts.length > 0) {
+      const newProducts: ProductData[] = [];
+      const newRows: string[][] = [];
+
+      for (const product of selectedProducts) {
+        let data: GetProductData = await fetch("/api/getProduct", {
+          method: "POST",
+          body: JSON.stringify({
+            id: product.id,
+          }),
+        }).then(async (res) => JSON.parse(await res.json()));
+
+        newProducts.push({
+          id: data.id,
+          name: data.title,
+          price: data.priceRangeV2.maxVariantPrice.amount,
+        });
+
+        newRows.push([data.title, data.priceRangeV2.maxVariantPrice.amount]);
+      }
+
+      setProducts(newProducts);
+      setRows(newRows);
+      setProductsChanged(true);
+    }
+  }
+
   // Submit Form: Save Edited Bundle
   async function handleSubmit() {
     setLoading(true);
-    const data: EditedBundleData = {
+    const data: any = {
       id: id as string,
       bundleName: bundleName,
       bundleTitle: bundleTitle,
       description: description,
       discount: discount,
     };
+
+    // Include products if they were changed
+    if (productsChanged) {
+      data.products = products.map((p) => p.id);
+    }
+
     let response = await fetch("/api/editBundle", {
       method: "POST",
       body: JSON.stringify(data),
@@ -282,9 +324,14 @@ const EditBundlePage: NextPage = () => {
                   <BlockStack gap="400">
                     <div style={{ padding: "1rem 1rem 0" }}>
                       <BlockStack gap="200">
-                        <span style={{ fontWeight: 600 }}>
-                          {i18n.translate("edit_bundle.products_table.title")}
-                        </span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontWeight: 600 }}>
+                            {i18n.translate("edit_bundle.products_table.title")}
+                          </span>
+                          <Button onClick={handleChangeProducts}>
+                            {productsChanged ? "✓ Products Changed" : "Change Products"}
+                          </Button>
+                        </div>
                       </BlockStack>
                     </div>
                     <DataTable

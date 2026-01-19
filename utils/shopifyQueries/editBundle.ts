@@ -6,6 +6,7 @@ export interface EditedBundleData {
   bundleTitle: string;
   description: string;
   discount: string;
+  products?: string[];
 }
 
 export interface BundleUpdateQuery {
@@ -27,6 +28,33 @@ export async function editBundle(
   client: GraphqlClient,
   data: EditedBundleData
 ) {
+  const fields: any[] = [
+    {
+      key: "bundle_name",
+      value: data.bundleName,
+    },
+    {
+      key: "bundle_title",
+      value: data.bundleTitle,
+    },
+    {
+      key: "description",
+      value: data.description,
+    },
+    {
+      key: "discount",
+      value: data.discount,
+    },
+  ];
+
+  // Add products field if provided
+  if (data.products && data.products.length > 0) {
+    fields.push({
+      key: "products",
+      value: JSON.stringify(data.products),
+    });
+  }
+
   const { body } = await client.query<BundleUpdateQuery>({
     data: {
       query: `mutation UpdateMetaobject($id: ID!, $metaobject: MetaobjectUpdateInput!) {
@@ -48,24 +76,7 @@ export async function editBundle(
       variables: {
         id: data.id,
         metaobject: {
-          fields: [
-            {
-              key: "bundle_name",
-              value: data.bundleName,
-            },
-            {
-              key: "bundle_title",
-              value: data.bundleTitle,
-            },
-            {
-              key: "description",
-              value: data.description,
-            },
-            {
-              key: "discount",
-              value: data.discount,
-            },
-          ],
+          fields: fields,
         },
       },
     },

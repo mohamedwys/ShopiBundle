@@ -3,7 +3,7 @@
 {% assign price = 0 %}
 
 {% if bundle %}
-  <div class="bundle">
+  <div class="bundle" data-bundle-id="{{ bundle.id }}">
     <p class="bundle-title">{{ bundle.bundle_title }}</p>
     <p class="bundle-description">{{ bundle.description }}</p>
     <p class="discounted-price">{{ bundle.discount }}% {{ 'discount' | t }}</p>
@@ -34,6 +34,7 @@
       | divided_by: 100
       | times: bundle.discount
     %}
+    {% assign savings = price | minus: discountedPrice | minus: price | abs %}
 
     <div class="add-to-cart-button">
       <p class="discounted-price">
@@ -41,15 +42,32 @@
         {{ price | minus: discountedPrice | money }}
         {{ 'only' | t }}
       </p>
-      <form action="/cart/add" method="post">
+      <p class="savings-badge">{{ 'save' | t }} {{ savings | money }}</p>
+
+      <form action="/cart/add" method="post" class="bundle-form">
         {% for product in bundle.products.value %}
           <input
             type="hidden"
-            name="id[]"
+            name="items[{{ forloop.index0 }}][id]"
             value="{{ product.variants.first.id }}"
           >
+          <input
+            type="hidden"
+            name="items[{{ forloop.index0 }}][quantity]"
+            value="1"
+          >
+          <input
+            type="hidden"
+            name="items[{{ forloop.index0 }}][properties][_bundle_id]"
+            value="{{ bundle.bundle_name.value }}"
+          >
+          <input
+            type="hidden"
+            name="items[{{ forloop.index0 }}][properties][_bundle_discount]"
+            value="{{ bundle.discount }}%"
+          >
         {% endfor %}
-        <button type="submit">{{ 'action' | t }}</button>
+        <button type="submit" class="bundle-add-to-cart-btn">{{ 'action' | t }}</button>
       </form>
     </div>
   </div>
@@ -60,13 +78,21 @@
   "name": "Product Bundle",
   "target": "section",
   "stylesheet": "style.css",
-  "templates": ["index"],
+  "javascript": "bundle.js",
+  "templates": ["index", "product", "collection", "cart"],
   "settings": [
     {
       "type": "text",
       "id": "shortcode",
       "label": "t:label",
       "info": "t:info"
+    },
+    {
+      "type": "checkbox",
+      "id": "auto_inject",
+      "label": "Auto-inject on product pages",
+      "info": "Automatically show bundle when customer views a bundled product",
+      "default": false
     }
   ]
 }
