@@ -329,14 +329,15 @@ After deployment, merchants should see:
 - `b532fc8` - Add comprehensive implementation summary
 - `7596196` - Fix TypeScript error: clientProvider type mismatch
 - `c12f729` - Fix TypeScript error: resourcePicker missing filter property
+- `8c5ab17` - Fix TypeScript error: resourcePicker return type
 - `b22a167` - Update TypeScript fix documentation
 
 **Total Changes:**
 - 21 files changed
-- 3,380+ insertions
-- 60 deletions
+- 3,385+ insertions
+- 62 deletions
 
-**Status:** ✅ All TypeScript compilation errors fixed
+**Status:** ✅ All TypeScript compilation errors fixed (3/3)
 
 **Pushed to:** `origin/claude/audit-shopify-bundle-app-PYAQO`
 
@@ -346,7 +347,7 @@ After deployment, merchants should see:
 
 ## 🔧 TypeScript Compilation Fixes
 
-During deployment, two TypeScript errors were identified and fixed:
+During deployment, three TypeScript errors were identified and fixed:
 
 ### Error 1: ClientProvider Type Mismatch
 **File:** `pages/api/proxy_route/bundles-for-product.ts`
@@ -357,6 +358,11 @@ During deployment, two TypeScript errors were identified and fixed:
 **File:** `pages/edit_bundle.tsx`
 **Issue:** Shopify App Bridge `resourcePicker` requires `filter` property
 **Fix:** Added `filter: { variants: true }` to resourcePicker configuration
+
+### Error 3: ResourcePicker Return Type
+**File:** `pages/edit_bundle.tsx`
+**Issue:** ResourcePicker returns `unknown` type, causing "Property 'length' does not exist" error
+**Fix:** Added Product type import and type assertion: `as Promise<Product[]>`
 
 **Documentation:** See `TYPESCRIPT_FIX.md` for complete details.
 

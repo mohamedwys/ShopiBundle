@@ -154,17 +154,73 @@ const selectedProducts = await window.shopify.resourcePicker({
 
 ---
 
+---
+
+## Issue 3: ResourcePicker Return Type
+
+Build failed with TypeScript error:
+```
+./pages/edit_bundle.tsx:154:46
+Type error: Property 'length' does not exist on type 'unknown'.
+```
+
+### Root Cause
+
+The `window.shopify.resourcePicker()` method returns type `unknown` and needs to be cast to the correct type.
+
+**Incorrect usage:**
+```typescript
+const selectedProducts = await window.shopify.resourcePicker({
+  type: "product",
+  multiple: true,
+  action: "select",
+  filter: {
+    variants: true,
+  },
+});
+// ❌ selectedProducts is type 'unknown'
+if (selectedProducts && selectedProducts.length > 0) { ... }
+```
+
+**Correct usage:**
+```typescript
+import { Product } from "@shopify/app-bridge/actions/ResourcePicker";
+
+const selectedProducts = await (window.shopify.resourcePicker({
+  type: "product",
+  multiple: true,
+  action: "select",
+  filter: {
+    variants: true,
+  },
+}) as Promise<Product[]>);
+// ✅ selectedProducts is now type 'Product[]'
+if (selectedProducts && selectedProducts.length > 0) { ... }
+```
+
+### Fix Applied
+
+**File:** `pages/edit_bundle.tsx`
+
+**Changes:**
+1. **Line 2:** Added import: `import { Product } from "@shopify/app-bridge/actions/ResourcePicker";`
+2. **Line 146-153:** Added type assertion: `as Promise<Product[]>`
+
+---
+
 ## Summary of All Fixes
 
-✅ **Fixed 2 TypeScript compilation errors:**
+✅ **Fixed 3 TypeScript compilation errors:**
 
 1. **Proxy Route API** (`bundles-for-product.ts`) - Fixed `clientProvider.offline.graphqlClient` call
 2. **Edit Bundle Page** (`edit_bundle.tsx`) - Added required `filter` property to `resourcePicker`
+3. **Edit Bundle Page** (`edit_bundle.tsx`) - Added type assertion for `resourcePicker` return value
 
 ## Commits
 
 - **Fix Commit 1:** `7596196` - Fixed clientProvider type error
 - **Fix Commit 2:** `c12f729` - Fixed resourcePicker missing property
+- **Fix Commit 3:** `8c5ab17` - Fixed resourcePicker return type
 - **Documentation:** `78f624f` - Added fix documentation
 
 **Branch:** `claude/audit-shopify-bundle-app-PYAQO`
