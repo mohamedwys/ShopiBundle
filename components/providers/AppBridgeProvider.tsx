@@ -1,39 +1,59 @@
 "use client";
 
-import { ReactNode, useMemo } from "react";
+import { ReactNode, useEffect, useState, createContext, useContext } from "react";
 import { useRouter } from "next/router";
-import { Provider } from "@shopify/app-bridge-react";
+import createApp, { type AppBridge } from "@shopify/app-bridge";
 
 interface AppBridgeProviderProps {
   children: ReactNode;
 }
 
+interface AppBridgeContextValue {
+  app: AppBridge | null;
+}
+
+const AppBridgeContext = createContext<AppBridgeContextValue>({ app: null });
+
+export const useAppBridge = () => useContext(AppBridgeContext);
+
 export default function AppBridgeProvider({ children }: AppBridgeProviderProps) {
   const router = useRouter();
+  const [app, setApp] = useState<AppBridge | null>(null);
   const { host } = router.query;
 
-  const config = useMemo(() => {
-    // Only create config when host is available
+  useEffect(() => {
     if (!host || typeof host !== 'string') {
-      return null;
+      return;
     }
 
-    return {
-      apiKey: process.env.NEXT_PUBLIC_SHOPIFY_API_KEY || '',
-      host: host,
-      forceRedirect: true,
+    const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY;
+    
+    if (!apiKey) {
+      console.error("NEXT_PUBLIC_SHOPIFY_API_KEY is not defined");
+      return;
+    }
+
+    try {
+      const appBridge = createApp({
+        apiKey,
+        host,
+        forceRedirect: true,
+      });
+
+      setApp(appBridge);
+    } catch (error) {
+      console.error("Error creating App Bridge:", error);
+    }
+
+    return () => {
+      // Cleanup if needed
+      setApp(null);
     };
   }, [host]);
 
-  // Render children even if host isn't ready yet to avoid hydration issues
-  // The Provider will handle initialization when config becomes available
-  if (!config) {
-    return <>{children}</>;
-  }
-
   return (
-    <Provider config={config}>
+    <AppBridgeContext.Provider value={{ app }}>
       {children}
-    </Provider>
+    </AppBridgeContext.Provider>
   );
 }
