@@ -7,27 +7,36 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     const { shop, embedded, host } = req.query;
 
     if (!shop || typeof shop !== 'string') {
-      res.status(500);
+      res.status(400);
       return res.send("No shop provided");
     }
 
     const sanitizedShop = shopify.utils.sanitizeShop(shop);
+    
+    if (!sanitizedShop) {
+      res.status(400);
+      return res.send("Invalid shop domain");
+    }
+
     console.log('Auth start for shop:', sanitizedShop, 'embedded:', embedded, 'host:', host);
 
-    // Handle embedded app redirect
-    if (embedded === "1" && host) {
+    // If request is from embedded app, redirect to exitframe
+    const isEmbedded = embedded === "1" || req.headers.referer?.includes(sanitizedShop);
+    
+    if (isEmbedded) {
       const queryParams = new URLSearchParams({
         shop: sanitizedShop,
-        host: typeof host === 'string' ? host : '',
+        ...(host && typeof host === 'string' && { host }),
+        redirectUri: `/api?shop=${sanitizedShop}${host ? `&host=${host}` : ''}`,
       }).toString();
 
-      console.log('Redirecting to exitframe');
+      console.log('Redirecting to exitframe to break out of iframe');
       return res.redirect(`/exitframe?${queryParams}`);
     }
 
     console.log('Starting OAuth for shop:', sanitizedShop);
 
-    // Start OAuth with proper configuration
+    // Start OAuth - this should only run outside iframe
     await shopify.auth.begin({
       shop: sanitizedShop,
       callbackPath: '/api/auth/callback',
@@ -44,29 +53,29 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     if (shop && typeof shop === 'string') {
       const sanitizedShop = shopify.utils.sanitizeShop(shop);
-      try {
-        await prisma.active_stores.upsert({
-          where: { shop: sanitizedShop },
-          update: { 
-            isActive: false,
-            lastError: error.message,
-            lastErrorAt: new Date(),
-          },
-          create: { 
-            shop: sanitizedShop, 
-            isActive: false,
-            lastError: error.message,
-            lastErrorAt: new Date(),
-          },
-        });
-
-        console.log('Cleared sessions for shop:', sanitizedShop);
-      } catch (dbError) {
-        console.error('Error updating DB:', dbError);
+      if (sanitizedShop) {
+        try {
+          await prisma.active_stores.upsert({
+            where: { shop: sanitizedShop },
+            update: { 
+              isActive: false,
+              lastError: error.message,
+              lastErrorAt: new Date(),
+            },
+            create: { 
+              shop: sanitizedShop, 
+              isActive: false,
+              lastError: error.message,
+              lastErrorAt: new Date(),
+            },
+          });
+        } catch (dbError) {
+          console.error('Error updating DB:', dbError);
+        }
       }
     }
     
-    res.status(500).send(error.message);
+    res.status(500).send(`Authentication error: ${error.message}`);
   }
 };
 
