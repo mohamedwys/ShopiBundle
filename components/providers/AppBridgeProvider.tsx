@@ -2,14 +2,14 @@
 
 import { ReactNode, useEffect, useState, createContext, useContext } from "react";
 import { useRouter } from "next/router";
-import createApp, { type AppBridge } from "@shopify/app-bridge";
+import createApp from "@shopify/app-bridge";
 
 interface AppBridgeProviderProps {
   children: ReactNode;
 }
 
 interface AppBridgeContextValue {
-  app: AppBridge | null;
+  app: ReturnType<typeof createApp> | null;
 }
 
 const AppBridgeContext = createContext<AppBridgeContextValue>({ app: null });
@@ -18,7 +18,7 @@ export const useAppBridge = () => useContext(AppBridgeContext);
 
 export default function AppBridgeProvider({ children }: AppBridgeProviderProps) {
   const router = useRouter();
-  const [app, setApp] = useState<AppBridge | null>(null);
+  const [app, setApp] = useState<ReturnType<typeof createApp> | null>(null);
   const { host } = router.query;
 
   useEffect(() => {
