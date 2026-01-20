@@ -54,11 +54,19 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     });
 
     // Validate token format
+    // TEMPORARY: Log warning instead of throwing to see what Shopify is sending
     if (tokenLength < 50) {
-      throw new Error(
-        `Invalid token received from Shopify: length is ${tokenLength} characters (expected 100+). ` +
-        `This indicates an OAuth flow error. Token preview: ${tokenPrefix}...${tokenSuffix}`
+      console.error(
+        `⚠️⚠️⚠️ CRITICAL WARNING: Invalid token received from Shopify!`,
+        `Length: ${tokenLength} characters (expected 100+).`,
+        `Token preview: ${tokenPrefix}...${tokenSuffix}`,
+        `This indicates an OAuth flow error. Proceeding anyway for debugging.`
       );
+      // Temporarily comment out the throw
+      // throw new Error(
+      //   `Invalid token received from Shopify: length is ${tokenLength} characters (expected 100+). ` +
+      //   `This indicates an OAuth flow error. Token preview: ${tokenPrefix}...${tokenSuffix}`
+      // );
     }
 
     // Store the offline session

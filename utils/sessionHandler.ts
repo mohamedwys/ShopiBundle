@@ -28,11 +28,19 @@ const sessionHandler = {
       });
 
       // Valid Shopify access tokens are 100+ characters and start with shpat_ or shpca_
+      // TEMPORARY: Log warning instead of throwing to see what Shopify is sending
       if (tokenLength < 50) {
-        throw new Error(
-          `Invalid access token: length is ${tokenLength} characters (expected 100+). ` +
-          `Token starts with: ${tokenPrefix}... This is NOT a valid Shopify access token.`
+        console.error(
+          `⚠️⚠️⚠️ CRITICAL WARNING: Invalid access token detected!`,
+          `Length: ${tokenLength} characters (expected 100+).`,
+          `Token starts with: ${tokenPrefix}...`,
+          `This token will likely cause 401 errors, but allowing storage for debugging.`
         );
+        // Temporarily comment out the throw to see what happens
+        // throw new Error(
+        //   `Invalid access token: length is ${tokenLength} characters (expected 100+). ` +
+        //   `Token starts with: ${tokenPrefix}... This is NOT a valid Shopify access token.`
+        // );
       }
 
       if (!tokenPrefix.startsWith('shpat_') && !tokenPrefix.startsWith('shpca_')) {
