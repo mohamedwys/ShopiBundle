@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from "@/utils/prisma";
 import shopify from "@/utils/shopify";
-import { GraphqlClient } from '@shopify/shopify-api';
+import { Session } from '@shopify/shopify-api';
 
 /**
  * Validates if the stored access token actually works with Shopify
@@ -86,7 +86,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     console.log('Testing token with Shopify API...');
 
     try {
-      const session = new shopify.session.Session({
+      const session = new Session({
         id: sessionId,
         shop,
         state: 'test',
