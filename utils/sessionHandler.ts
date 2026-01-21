@@ -27,36 +27,21 @@ const sessionHandler = {
         isValid: tokenLength > 50 && (tokenPrefix.startsWith('shpat_') || tokenPrefix.startsWith('shpca_'))
       });
 
-      // Valid Shopify access tokens are 100+ characters and start with shpat_ or shpca_
-      // STRICT VALIDATION ENABLED
+      // VALIDATION TEMPORARILY DISABLED FOR DIAGNOSTICS
+      // Log warnings but allow storage to see what token we actually get from Shopify
       if (tokenLength < 50) {
-        console.error(
-          `❌ CRITICAL ERROR: Refusing to store invalid access token!`,
-          `Length: ${tokenLength} characters (expected 100+).`,
-          `Token starts with: ${tokenPrefix}...`,
-          `This token is invalid and will cause 401 errors on all API calls.`
-        );
-
-        throw new Error(
-          `Cannot store invalid access token: length is ${tokenLength} characters (expected 100+). ` +
-          `Token starts with: ${tokenPrefix}... This is NOT a valid Shopify access token. ` +
-          `The app is misconfigured in Shopify Partners Dashboard. ` +
-          `See SHOPIFY_APP_FIX_GUIDE.md for resolution steps.`
+        console.warn(
+          `⚠️ Token length is ${tokenLength} (typically expect 100+).`,
+          `Token: ${tokenPrefix}...`,
+          `Storing anyway for diagnostic purposes - will test if it works with API calls`
         );
       }
 
       if (!tokenPrefix.startsWith('shpat_') && !tokenPrefix.startsWith('shpca_')) {
-        console.error(
-          `❌ CRITICAL ERROR: Invalid token prefix!`,
-          `Received: ${tokenPrefix}... Expected: shpat_... or shpca_...`,
-          `Length: ${tokenLength}`
-        );
-
-        throw new Error(
-          `Invalid token prefix: ${tokenPrefix}. ` +
-          `Valid Shopify tokens must start with 'shpat_' or 'shpca_'. ` +
-          `This indicates an app configuration issue in Shopify Partners Dashboard. ` +
-          `See SHOPIFY_APP_FIX_GUIDE.md for resolution steps.`
+        console.warn(
+          `⚠️ Token prefix is '${tokenPrefix}' (typically expect shpat_ or shpca_)`,
+          `Length: ${tokenLength}`,
+          `Storing anyway - actual API calls will reveal if token is valid`
         );
       }
 
