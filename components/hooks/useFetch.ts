@@ -1,20 +1,22 @@
+import { useAppBridge } from "@/components/providers/AppBridgeProvider";
+import { getSessionToken } from "@shopify/app-bridge/utilities";
+
 function useFetch() {
+  const { app } = useAppBridge();
+
   return async (uri: RequestInfo, options?: RequestInit) => {
-    // Get session token from the shopify app bridge
+    // Get session token from App Bridge 3.x
     let token = "";
 
-    // Try to get token from window.shopify (App Bridge injected by Shopify)
-    if (window?.shopify?.idToken) {
+    if (app) {
       try {
-        // In App Bridge 4.x, the token is available directly
-        token = await window.shopify.idToken();
-        console.log('✓ Session token obtained from window.shopify');
+        token = await getSessionToken(app);
+        console.log('✓ Session token obtained from App Bridge');
       } catch (error) {
-        console.error("Error getting session token from window.shopify:", error);
+        console.error("Error getting session token:", error);
       }
     } else {
-      console.warn('window.shopify.idToken not available - App Bridge may not be loaded');
-      console.warn('This may cause authentication issues. Check console for errors.');
+      console.warn('App Bridge not initialized - cannot get session token');
     }
 
     const headers = {
