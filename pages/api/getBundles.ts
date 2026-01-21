@@ -16,6 +16,9 @@ interface BundlesResponse {
 interface ErrorResponse {
   error: string;
   message?: string;
+  diagnosticUrl?: string;
+  fixSteps?: string[];
+  details?: any;
 }
 
 const handler = async (
@@ -26,10 +29,12 @@ const handler = async (
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // Declare shop outside try-catch so it's accessible in catch block
+  let shop: string | undefined;
+
   try {
     // Extract shop from the authorization token
     const authHeader = req.headers.authorization;
-    let shop: string | undefined;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
@@ -84,15 +89,17 @@ const handler = async (
       console.error('This means the access token is INVALID or EXPIRED');
       console.error('Solution: Delete session and reinstall app');
 
+      const shopParam = shop || 'YOUR_SHOP.myshopify.com';
+
       return res.status(401).json({
         error: "Invalid access token",
         message: "The stored access token is invalid. Please reinstall the app to generate a new token.",
-        diagnosticUrl: `/api/debug/validate-token?shop=${shop}`,
+        diagnosticUrl: `/api/debug/validate-token?shop=${shopParam}`,
         fixSteps: [
-          "Step 1: Visit /api/debug/force-delete-session?shop=" + shop + "&confirm=yes",
+          "Step 1: Visit /api/debug/force-delete-session?shop=" + shopParam + "&confirm=yes",
           "Step 2: Uninstall app from Shopify admin",
           "Step 3: Wait 30 seconds",
-          "Step 4: Reinstall app via /api?shop=" + shop,
+          "Step 4: Reinstall app via /api?shop=" + shopParam,
         ],
       });
     }
