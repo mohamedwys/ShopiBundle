@@ -48,9 +48,19 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     if (process.env.SHOPIFY_API_SECRET) {
       const secret = process.env.SHOPIFY_API_SECRET;
       if (!/^[a-f0-9]{32}$/i.test(secret)) {
-        warnings.push(
-          `API Secret format looks unusual. Expected 32 hexadecimal characters, got: ${secret.length} chars`
-        );
+        const warningMsg = `API Secret format looks unusual. Expected 32 hexadecimal characters, got: ${secret.length} chars`;
+
+        if (secret.length === 38) {
+          // 38 chars = same length as invalid shpua_ token!
+          issues.push(
+            `${warningMsg}. CRITICAL: This 38-character secret length matches the invalid shpua_ token format. ` +
+            `This strongly indicates your app is configured as a CUSTOM APP or LEGACY APP in Shopify Partners Dashboard. ` +
+            `You MUST reconfigure it as a PUBLIC APP or create a new PUBLIC APP. ` +
+            `Custom apps use different authentication and will always generate invalid tokens for OAuth flows.`
+          );
+        } else {
+          warnings.push(warningMsg);
+        }
       }
     }
 
@@ -132,11 +142,12 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     };
 
     // Check OAuth callback configuration
-    const expectedCallbackUrl = `${process.env.SHOPIFY_APP_URL}/api/auth/callback`;
+    const appUrl = process.env.SHOPIFY_APP_URL?.replace(/\/$/, '') || '';
+    const expectedCallbackUrl = `${appUrl}/api/auth/callback`;
 
     recommendations.push(
       `Ensure your Shopify Partners Dashboard has these exact settings:\n` +
-      `  - App URL: ${process.env.SHOPIFY_APP_URL}\n` +
+      `  - App URL: ${appUrl}\n` +
       `  - Redirect URL: ${expectedCallbackUrl}\n` +
       `  - API Version: ${process.env.SHOPIFY_API_VERSION}\n` +
       `  - Scopes: ${process.env.SHOPIFY_API_SCOPES}`
@@ -164,7 +175,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           ? `${process.env.SHOPIFY_API_KEY.substring(0, 8)}...`
           : 'MISSING',
         apiSecretSet: !!process.env.SHOPIFY_API_SECRET,
-        appUrl: process.env.SHOPIFY_APP_URL || 'MISSING',
+        apiSecretLength: process.env.SHOPIFY_API_SECRET?.length || 0,
+        appUrl: appUrl || 'MISSING',
+        appUrlRaw: process.env.SHOPIFY_APP_URL || 'MISSING',
         apiVersion: process.env.SHOPIFY_API_VERSION || 'MISSING',
         scopes: process.env.SHOPIFY_API_SCOPES?.split(',') || [],
         callbackUrl: expectedCallbackUrl,

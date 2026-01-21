@@ -48,7 +48,7 @@ const shopify = shopifyApi({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET,
   scopes: process.env.SHOPIFY_API_SCOPES.split(","),
-  hostName: process.env.SHOPIFY_APP_URL.replace(/https?:\/\//, ""), // Support both http and https
+  hostName: process.env.SHOPIFY_APP_URL.replace(/https?:\/\//, "").replace(/\/$/, ""), // Remove protocol and trailing slash
   hostScheme: "https",
   apiVersion: process.env.SHOPIFY_API_VERSION as ApiVersion,
   isEmbeddedApp: true,

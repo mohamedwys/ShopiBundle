@@ -54,25 +54,35 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     if (!envVarsOk) readyForOAuth = false;
 
     // Check 2: App URL configuration
-    const appUrl = process.env.SHOPIFY_APP_URL || '';
-    const appUrlValid = appUrl.startsWith('https://') && !appUrl.endsWith('/');
+    const appUrlRaw = process.env.SHOPIFY_APP_URL || '';
+    const appUrl = appUrlRaw.replace(/\/$/, ''); // Remove trailing slash
+    const appUrlValid = appUrlRaw.startsWith('https://');
+    const hasTrailingSlash = appUrlRaw.endsWith('/');
 
     checks.push({
       name: 'App URL Configuration',
       status: appUrlValid ? 'PASS' : 'FAIL',
       details: {
         url: appUrl,
-        usesHttps: appUrl.startsWith('https://'),
-        noTrailingSlash: !appUrl.endsWith('/'),
+        urlRaw: appUrlRaw,
+        usesHttps: appUrlRaw.startsWith('https://'),
+        hasTrailingSlash: hasTrailingSlash,
         expectedCallbackUrl: `${appUrl}/api/auth/callback`,
       },
     });
+
+    if (hasTrailingSlash) {
+      checks[checks.length - 1].warning =
+        'App URL has trailing slash. This is automatically removed in code, but should be fixed in environment variable.';
+    }
 
     if (!appUrlValid) readyForOAuth = false;
 
     // Check 3: API credentials format
     const apiKey = process.env.SHOPIFY_API_KEY || '';
+    const apiSecret = process.env.SHOPIFY_API_SECRET || '';
     const apiKeyValid = /^[a-f0-9]{32}$/i.test(apiKey);
+    const apiSecretValid = /^[a-f0-9]{32}$/i.test(apiSecret);
 
     checks.push({
       name: 'API Key Format',
@@ -88,6 +98,29 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     if (!apiKeyValid) {
       checks[checks.length - 1].warning =
         'API key format is unusual. This may indicate a legacy or incorrectly configured app in Shopify Partners Dashboard.';
+    }
+
+    // Check 3b: API Secret format (critical for detecting custom app issue)
+    checks.push({
+      name: 'API Secret Format',
+      status: apiSecretValid ? 'PASS' : apiSecret.length === 38 ? 'FAIL' : 'WARNING',
+      details: {
+        length: apiSecret.length,
+        expectedLength: 32,
+        format: apiSecretValid ? 'Valid hex format' : 'Unusual format',
+      },
+    });
+
+    if (apiSecret.length === 38) {
+      readyForOAuth = false;
+      checks[checks.length - 1].error =
+        'CRITICAL: 38-character API secret indicates CUSTOM APP or LEGACY APP configuration. ' +
+        'This is the same length as the invalid shpua_ tokens. ' +
+        'You MUST reconfigure as PUBLIC APP or create a new PUBLIC APP in Shopify Partners Dashboard. ' +
+        'Custom apps cannot be used for OAuth flows with embedded apps.';
+    } else if (!apiSecretValid) {
+      checks[checks.length - 1].warning =
+        'API secret format is unusual. Expected 32 hexadecimal characters for standard public apps.';
     }
 
     // Check 4: API version
@@ -181,7 +214,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     });
 
     // Generate OAuth URL for testing
-    const oauthUrl = `${process.env.SHOPIFY_APP_URL}/api?shop=${sanitizedShop}`;
+    const oauthUrl = `${appUrl}/api?shop=${sanitizedShop}`;
 
     // Final assessment
     const assessment = {
@@ -193,23 +226,37 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       oauthUrl: readyForOAuth ? oauthUrl : undefined,
       partnersConfiguration: {
         message: 'Ensure these settings match in Shopify Partners Dashboard',
-        appUrl: process.env.SHOPIFY_APP_URL,
-        redirectUrl: `${process.env.SHOPIFY_APP_URL}/api/auth/callback`,
+        appUrl: appUrl,
+        redirectUrl: `${appUrl}/api/auth/callback`,
         apiVersion: process.env.SHOPIFY_API_VERSION,
         scopes: process.env.SHOPIFY_API_SCOPES?.split(','),
         clientId: apiKey ? `${apiKey.substring(0, 8)}...` : 'MISSING',
+        requiredAppType: 'PUBLIC APP (not Custom App or Legacy App)',
       },
       knownIssue: {
         problem: 'Receiving shpua_ tokens (38 chars) instead of shpat_/shpca_ tokens (100+ chars)',
-        cause: 'App misconfiguration in Shopify Partners Dashboard',
-        solutions: [
-          '1. Verify app is created as "Public app" (not custom/legacy type)',
-          '2. Confirm Client ID in Partners matches your SHOPIFY_API_KEY',
-          '3. Check redirect URLs match exactly',
-          '4. Try rotating API credentials in Partners Dashboard',
-          '5. If all else fails, create a new app in Partners Dashboard',
-        ],
-        documentation: 'See SHOPIFY_APP_FIX_GUIDE.md for detailed steps',
+        cause: apiSecret.length === 38
+          ? 'CONFIRMED: App is configured as CUSTOM APP or LEGACY APP (38-char secret detected)'
+          : 'App misconfiguration in Shopify Partners Dashboard',
+        solutions: apiSecret.length === 38
+          ? [
+              '⚠️ CRITICAL: Your 38-character API secret confirms this is a CUSTOM APP',
+              '1. Go to Shopify Partners Dashboard → Apps',
+              '2. Create a NEW app and select "Public app" type',
+              '3. Configure URLs: App URL and Redirect URL (see partnersConfiguration above)',
+              '4. Copy the NEW 32-character API key and secret',
+              '5. Update SHOPIFY_API_KEY and SHOPIFY_API_SECRET in your environment',
+              '6. Redeploy your application',
+              '7. Custom apps CANNOT be converted to public apps - you must create a new one',
+            ]
+          : [
+              '1. Verify app is created as "Public app" (not custom/legacy type)',
+              '2. Confirm Client ID in Partners matches your SHOPIFY_API_KEY',
+              '3. Check redirect URLs match exactly',
+              '4. Try rotating API credentials in Partners Dashboard',
+              '5. If all else fails, create a new PUBLIC app in Partners Dashboard',
+            ],
+        documentation: 'See SHOPIFY_APP_FIX_GUIDE.md and AUTHENTICATION_FIX_SUMMARY.md for detailed steps',
       },
       nextSteps: readyForOAuth
         ? [
