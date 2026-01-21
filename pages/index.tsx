@@ -19,14 +19,18 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const { app } = useAppBridge();
+  const { app, error: appBridgeError, isReady } = useAppBridge();
 
   const handleAuthError = () => {
-    if (app) {
-      // Redirect to auth if session is missing
+    const shop = new URLSearchParams(window.location.search).get('shop');
+    if (shop) {
+      // Redirect to auth
+      window.location.href = `/api?shop=${shop}`;
+    } else if (app) {
+      // Try using App Bridge redirect
       const redirect = Redirect.create(app);
       redirect.dispatch(Redirect.Action.REMOTE, {
-        url: `/api/auth?shop=${new URLSearchParams(window.location.search).get('shop')}`,
+        url: `/api?shop=${shop}`,
         newContext: false,
       });
     }
@@ -35,20 +39,23 @@ export default function Home() {
   const fetchBundles = async () => {
     setLoading(true);
     setError(null);
-    
+
     if (!app) {
-      setError("App Bridge not initialized");
+      setError("App Bridge not initialized. Please wait or reinstall the app.");
       setLoading(false);
       return;
     }
 
     try {
+      console.log('Fetching session token from App Bridge...');
       // Get session token from App Bridge
       const token = await getSessionToken(app);
-      
+      console.log('✓ Session token obtained');
+
+      console.log('Fetching bundles from API...');
       const response = await fetch("/api/getBundles", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
@@ -57,20 +64,23 @@ export default function Home() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        
+        console.error('API error:', errorData);
+
         // If it's an auth error, redirect to auth
         if (response.status === 401 || response.status === 403) {
+          console.log('Authentication error - redirecting to auth flow');
           handleAuthError();
           return;
         }
-        
+
         throw new Error(errorData.error || errorData.message || "Failed to load bundles");
       }
 
       const data: BundlesApiResponse = await response.json();
-      
+      console.log('✓ Bundles fetched successfully:', data);
+
       // Extract bundles from the response
-      const bundlesData = Array.isArray(data.bundles?.edges) 
+      const bundlesData = Array.isArray(data.bundles?.edges)
         ? data.bundles.edges.map((edge: any) => ({
             id: edge.node.id,
             name: edge.node.fields.find((f: any) => f.key === "name")?.value || "Unnamed Bundle",
@@ -87,10 +97,27 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Wait for App Bridge to be ready
+    if (!isReady) {
+      return;
+    }
+
+    // If there's an App Bridge error, show it
+    if (appBridgeError) {
+      setError(appBridgeError);
+      setLoading(false);
+      return;
+    }
+
+    // If App Bridge is ready and no error, try fetching bundles
     if (app) {
       fetchBundles();
+    } else {
+      // App Bridge should have initialized by now
+      setError("App Bridge failed to initialize. Please check the browser console for details.");
+      setLoading(false);
     }
-  }, [app]);
+  }, [app, appBridgeError, isReady]);
 
   if (loading) {
     return (
