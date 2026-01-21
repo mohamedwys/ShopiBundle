@@ -24,25 +24,46 @@ const sessionHandler = {
       console.log('Token validation:', {
         length: tokenLength,
         prefix: tokenPrefix + '...',
-        isValid: tokenLength > 50 && (tokenPrefix.startsWith('shpat_') || tokenPrefix.startsWith('shpca_'))
+        isValid: tokenLength >= 30 && (tokenPrefix.startsWith('shpat_') || tokenPrefix.startsWith('shpca_'))
       });
 
-      // VALIDATION TEMPORARILY DISABLED FOR DIAGNOSTICS
-      // Log warnings but allow storage to see what token we actually get from Shopify
-      if (tokenLength < 50) {
-        console.warn(
-          `⚠️ Token length is ${tokenLength} (typically expect 100+).`,
-          `Token: ${tokenPrefix}...`,
-          `Storing anyway for diagnostic purposes - will test if it works with API calls`
+      // Validate token format - CORRECTED VALIDATION
+      // Shopify returns different token formats:
+      // - 38-character tokens: shpat_... (valid for certain app configs)
+      // - 100+ character tokens: shpat_... or shpca_... (standard format)
+
+      // Check prefix (most important)
+      if (!tokenPrefix.startsWith('shpat_') && !tokenPrefix.startsWith('shpca_')) {
+        console.error(
+          `❌ CRITICAL ERROR: Invalid token prefix!`,
+          `Received: ${tokenPrefix}... Expected: shpat_... or shpca_...`
+        );
+
+        throw new Error(
+          `Invalid token prefix: ${tokenPrefix}. ` +
+          `Valid Shopify tokens must start with 'shpat_' or 'shpca_'.`
         );
       }
 
-      if (!tokenPrefix.startsWith('shpat_') && !tokenPrefix.startsWith('shpca_')) {
-        console.warn(
-          `⚠️ Token prefix is '${tokenPrefix}' (typically expect shpat_ or shpca_)`,
-          `Length: ${tokenLength}`,
-          `Storing anyway - actual API calls will reveal if token is valid`
+      // Check minimum length
+      if (tokenLength < 30) {
+        console.error(
+          `❌ CRITICAL ERROR: Token too short!`,
+          `Length: ${tokenLength} characters (minimum 30 expected).`
         );
+
+        throw new Error(
+          `Invalid token: too short (${tokenLength} chars). Token may be corrupted.`
+        );
+      }
+
+      // Log accepted token format
+      if (tokenLength === 38) {
+        console.log(`✓ Storing session with 38-char shpat_ token (valid Shopify format)`);
+      } else if (tokenLength > 100) {
+        console.log(`✓ Storing session with ${tokenLength}-char token (standard format)`);
+      } else {
+        console.log(`✓ Storing session with ${tokenLength}-char token (valid prefix confirmed)`);
       }
 
       // CRITICAL: Delete any existing sessions for this shop before storing new one

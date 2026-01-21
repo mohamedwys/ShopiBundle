@@ -53,26 +53,44 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       },
     });
 
-    // VALIDATION TEMPORARILY DISABLED FOR DIAGNOSTICS
-    // We need to see what token format Shopify actually returns
-    console.log('🔍 TOKEN VALIDATION (warnings only):');
+    // Validate token format - CORRECTED VALIDATION
+    // Shopify returns different token formats:
+    // - 38-character tokens: shpat_... (newer format for some apps)
+    // - 100+ character tokens: shpat_... or shpca_... (standard format)
+    console.log('🔍 TOKEN VALIDATION:');
 
-    if (tokenLength < 50) {
-      console.warn(
-        `⚠️ Token length is ${tokenLength} (typically expect 100+)`,
-        `Token: ${tokenPrefix}...${tokenSuffix}`,
-        `Allowing to proceed for diagnostic purposes`
-      );
-    }
-
+    // Most important: Check prefix
     if (!tokenPrefix.startsWith('shpat_') && !tokenPrefix.startsWith('shpca_')) {
-      console.warn(
-        `⚠️ Token prefix is '${tokenPrefix}' (typically expect shpat_ or shpca_)`,
-        `Allowing to proceed - will test if it works with Shopify API`
+      console.error(
+        `❌ CRITICAL ERROR: Invalid token prefix!`,
+        `Received: ${tokenPrefix}... Expected: shpat_... or shpca_...`
+      );
+
+      throw new Error(
+        `INVALID TOKEN PREFIX: ${tokenPrefix}\n\n` +
+        `Valid Shopify tokens must start with 'shpat_' or 'shpca_'.\n` +
+        `This indicates an app configuration issue in Shopify Partners Dashboard.`
       );
     }
 
-    console.log('✓ Token validation: PASSED (warnings logged if any issues detected)');
+    // Check minimum length (tokens should be at least 30 chars)
+    if (tokenLength < 30) {
+      console.error(
+        `❌ CRITICAL ERROR: Token too short!`,
+        `Length: ${tokenLength} characters (minimum 30 expected).`
+      );
+
+      throw new Error(`Invalid token: too short (${tokenLength} chars). Token may be corrupted.`);
+    }
+
+    // Log token format for monitoring
+    if (tokenLength === 38) {
+      console.log(`✓ Token validation PASSED: 38-char shpat_ format (valid Shopify token)`);
+    } else if (tokenLength > 100) {
+      console.log(`✓ Token validation PASSED: ${tokenLength}-char format (standard Shopify token)`);
+    } else {
+      console.log(`✓ Token validation PASSED: ${tokenLength}-char with valid prefix (accepting)`);
+    }
 
     // Store the offline session
     await sessionHandler.storeSession(session);
