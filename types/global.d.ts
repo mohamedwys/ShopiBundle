@@ -1,3 +1,6 @@
+import { Session } from '@shopify/shopify-api';
+import { NextApiRequest } from 'next';
+
 declare global {
   interface Window {
     shopify?: {
@@ -12,6 +15,13 @@ declare global {
         mobile: boolean;
       };
     };
+  }
+}
+
+declare module 'next' {
+  interface NextApiRequest {
+    user_session?: Session;
+    shop?: string;
   }
 }
 
