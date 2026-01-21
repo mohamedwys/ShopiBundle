@@ -114,10 +114,10 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
 
       results.checks.tokenValidation = {
         valid: true,
-        shopName: response.body.data.shop.name,
-        shopEmail: response.body.data.shop.email,
-        shopDomain: response.body.data.shop.myshopifyDomain,
-        plan: response.body.data.shop.plan.displayName,
+        shopName: response.body?.data?.shop?.name || 'Unknown',
+        shopEmail: response.body?.data?.shop?.email || 'Unknown',
+        shopDomain: response.body?.data?.shop?.myshopifyDomain || shop,
+        plan: response.body?.data?.shop?.plan?.displayName || 'Unknown',
       };
 
       console.log('✓ Token is VALID!');
