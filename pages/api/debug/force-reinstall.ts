@@ -32,9 +32,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     // Delete any online sessions
     const onlineSessions = await sessionHandler.findSessionsByShop(shop);
-    for (const sessionId of onlineSessions) {
-      await sessionHandler.deleteSession(sessionId);
-      console.log(`✓ Deleted online session: ${sessionId}`);
+    for (const session of onlineSessions) {
+      await sessionHandler.deleteSession(session.id);
+      console.log(`✓ Deleted online session: ${session.id}`);
     }
 
     // Delete from active_stores table
