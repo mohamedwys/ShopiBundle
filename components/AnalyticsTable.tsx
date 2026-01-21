@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import useFetch from "./hooks/useFetch";
 import { DataTable, Card, Spinner, BlockStack, Text } from "@shopify/polaris";
 import { useI18n } from "@shopify/react-i18n";
+import { useAppBridge } from "./providers/AppBridgeProvider";
 
 export default function AnalyticsTable() {
   const fetch = useFetch();
   const [i18n] = useI18n();
+  const { isReady, error: appBridgeError } = useAppBridge();
 
   const [gettingData, setGettingData] = useState(false);
   const [totalSales, setTotalSales] = useState(0);
@@ -48,8 +50,10 @@ export default function AnalyticsTable() {
   }
 
   useEffect(() => {
-    getData();
-  }, []);
+    if (isReady && !appBridgeError) {
+      getData();
+    }
+  }, [isReady, appBridgeError]);
 
   // when getting data showing spinner
   if (gettingData) {

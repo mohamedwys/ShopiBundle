@@ -7,12 +7,14 @@ import {
   Button,
   BlockStack,
   InlineStack,
+  Spinner,
 } from "@shopify/polaris";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import useFetch from "./hooks/useFetch";
 import { GetBundlesData } from "@/utils/shopifyQueries/getBundles";
 import { useI18n } from "@shopify/react-i18n";
+import { useAppBridge } from "./providers/AppBridgeProvider";
 
 export type Fieldvalues = {
   bundle_name?: string;
@@ -28,6 +30,7 @@ export default function ProductsTable() {
   const fetch = useFetch();
   const router = useRouter();
   const [i18n] = useI18n();
+  const { isReady, error: appBridgeError } = useAppBridge();
 
   const [bundles, setBundles] = useState([]);
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
@@ -110,10 +113,12 @@ export default function ProductsTable() {
     }
   }
 
-  // initially get all bundles
+  // initially get all bundles - wait for App Bridge to be ready
   useEffect(() => {
-    getBunldes(true);
-  }, []);
+    if (isReady && !appBridgeError) {
+      getBunldes(true);
+    }
+  }, [isReady, appBridgeError]);
 
   const resourceName = {
     singular: `${i18n.translate("index.title")}`,
@@ -127,6 +132,30 @@ export default function ProductsTable() {
   const navigateToEdit = (id: string) => {
     router.push(`/edit_bundle?id=${encodeURIComponent(id)}`);
   };
+
+  // Show loading while App Bridge initializes
+  if (!isReady) {
+    return (
+      <Card>
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <Spinner size="large" />
+        </div>
+      </Card>
+    );
+  }
+
+  // Show error if App Bridge failed
+  if (appBridgeError) {
+    return (
+      <Card>
+        <div style={{ padding: '20px' }}>
+          <Text as="p" tone="critical">
+            Error initializing app: {appBridgeError}
+          </Text>
+        </div>
+      </Card>
+    );
+  }
 
   // table data
   const rowMarkup = bundles.map(
