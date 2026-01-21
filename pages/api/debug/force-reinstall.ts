@@ -25,16 +25,28 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
     console.log(`🗑️  Force reinstall requested for shop: ${shop}`);
 
-    // Delete offline session
+    // Delete offline session (ignore if doesn't exist)
     const offlineSessionId = shopify.session.getOfflineId(shop);
-    await sessionHandler.deleteSession(offlineSessionId);
-    console.log(`✓ Deleted offline session: ${offlineSessionId}`);
+    try {
+      await sessionHandler.deleteSession(offlineSessionId);
+      console.log(`✓ Deleted offline session: ${offlineSessionId}`);
+    } catch (e) {
+      console.log(`ℹ️  No offline session to delete: ${offlineSessionId} (this is ok)`);
+    }
 
-    // Delete any online sessions
-    const onlineSessions = await sessionHandler.findSessionsByShop(shop);
-    for (const session of onlineSessions) {
-      await sessionHandler.deleteSession(session.id);
-      console.log(`✓ Deleted online session: ${session.id}`);
+    // Delete any online sessions (ignore if don't exist)
+    try {
+      const onlineSessions = await sessionHandler.findSessionsByShop(shop);
+      for (const session of onlineSessions) {
+        try {
+          await sessionHandler.deleteSession(session.id);
+          console.log(`✓ Deleted online session: ${session.id}`);
+        } catch (e) {
+          console.log(`ℹ️  Could not delete session ${session.id} (may already be deleted)`);
+        }
+      }
+    } catch (e) {
+      console.log(`ℹ️  No online sessions to delete (this is ok)`);
     }
 
     // Delete from active_stores table
