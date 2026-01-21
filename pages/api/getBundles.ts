@@ -16,6 +16,9 @@ interface BundlesResponse {
 interface ErrorResponse {
   error: string;
   message?: string;
+  diagnosticUrl?: string;
+  fixSteps?: string[];
+  details?: any;
 }
 
 const handler = async (
