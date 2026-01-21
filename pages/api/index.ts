@@ -4,7 +4,7 @@ import prisma from "@/utils/prisma";
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
-    const { shop, embedded, host } = req.query;
+    const { shop, embedded, host, fromExitframe } = req.query;
 
     if (!shop || typeof shop !== 'string') {
       res.status(400);
@@ -12,22 +12,24 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     }
 
     const sanitizedShop = shopify.utils.sanitizeShop(shop);
-    
+
     if (!sanitizedShop) {
       res.status(400);
       return res.send("Invalid shop domain");
     }
 
-    console.log('Auth start for shop:', sanitizedShop, 'embedded:', embedded, 'host:', host);
+    console.log('Auth start for shop:', sanitizedShop, 'embedded:', embedded, 'host:', host, 'fromExitframe:', fromExitframe);
 
-    // If request is from embedded app, redirect to exitframe
-    const isEmbedded = embedded === "1" || req.headers.referer?.includes(sanitizedShop);
-    
-    if (isEmbedded) {
+    // If request is from embedded app, redirect to exitframe to break out of iframe
+    // IMPORTANT: Only redirect if explicitly embedded AND not already coming from exitframe
+    const isEmbedded = embedded === "1";
+    const alreadyExited = fromExitframe === "1";
+
+    if (isEmbedded && !alreadyExited) {
       const queryParams = new URLSearchParams({
         shop: sanitizedShop,
         ...(host && typeof host === 'string' && { host }),
-        redirectUri: `/api?shop=${sanitizedShop}${host ? `&host=${host}` : ''}`,
+        redirectUri: `/api?shop=${sanitizedShop}${host ? `&host=${host}` : ''}&fromExitframe=1`,
       }).toString();
 
       console.log('Redirecting to exitframe to break out of iframe');
