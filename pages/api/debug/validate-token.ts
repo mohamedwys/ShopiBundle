@@ -112,16 +112,33 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
         },
       });
 
-      results.checks.tokenValidation = {
-        valid: true,
-        shopName: response.body?.data?.shop?.name || 'Unknown',
-        shopEmail: response.body?.data?.shop?.email || 'Unknown',
-        shopDomain: response.body?.data?.shop?.myshopifyDomain || shop,
-        plan: response.body?.data?.shop?.plan?.displayName || 'Unknown',
-      };
+      // Check if response has data
+      if (response.body && response.body.data && response.body.data.shop) {
+        const shopData = response.body.data.shop;
 
-      console.log('✓ Token is VALID!');
-      results.recommendations.push('✓ Token is working correctly!');
+        results.checks.tokenValidation = {
+          valid: true,
+          shopName: shopData.name,
+          shopEmail: shopData.email,
+          shopDomain: shopData.myshopifyDomain,
+          plan: shopData.plan.displayName,
+        };
+
+        console.log('✓ Token is VALID!');
+        results.recommendations.push('✓ Token is working correctly!');
+      } else {
+        // Token worked but response is unexpected
+        results.checks.tokenValidation = {
+          valid: true,
+          shopName: 'Unknown (unexpected response format)',
+          shopEmail: 'Unknown',
+          shopDomain: shop,
+          plan: 'Unknown',
+        };
+
+        console.log('✓ Token is VALID (but response format unexpected)');
+        results.recommendations.push('✓ Token is working but response format was unexpected');
+      }
 
     } catch (apiError: any) {
       console.error('Token validation failed:', apiError);
