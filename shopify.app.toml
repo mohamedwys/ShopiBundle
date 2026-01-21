@@ -11,6 +11,6 @@ api_version = "2025-10"
 scopes = "write_metaobjects,read_metaobjects,write_metaobject_definitions,read_products,write_discounts,read_orders" 
 
 [auth]
-redirect_urls = [ 
-    "https://shopi-bundle.vercel.app/api/auth/tokens",
-    "https://shopi-bundle.vercel.app/api/auth/callback"]
+redirect_urls = [
+    "https://shopi-bundle.vercel.app/api/auth/callback"
+]

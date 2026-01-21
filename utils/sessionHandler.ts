@@ -28,25 +28,35 @@ const sessionHandler = {
       });
 
       // Valid Shopify access tokens are 100+ characters and start with shpat_ or shpca_
-      // TEMPORARY: Log warning instead of throwing to see what Shopify is sending
+      // STRICT VALIDATION ENABLED
       if (tokenLength < 50) {
         console.error(
-          `⚠️⚠️⚠️ CRITICAL WARNING: Invalid access token detected!`,
+          `❌ CRITICAL ERROR: Refusing to store invalid access token!`,
           `Length: ${tokenLength} characters (expected 100+).`,
           `Token starts with: ${tokenPrefix}...`,
-          `This token will likely cause 401 errors, but allowing storage for debugging.`
+          `This token is invalid and will cause 401 errors on all API calls.`
         );
-        // Temporarily comment out the throw to see what happens
-        // throw new Error(
-        //   `Invalid access token: length is ${tokenLength} characters (expected 100+). ` +
-        //   `Token starts with: ${tokenPrefix}... This is NOT a valid Shopify access token.`
-        // );
+
+        throw new Error(
+          `Cannot store invalid access token: length is ${tokenLength} characters (expected 100+). ` +
+          `Token starts with: ${tokenPrefix}... This is NOT a valid Shopify access token. ` +
+          `The app is misconfigured in Shopify Partners Dashboard. ` +
+          `See SHOPIFY_APP_FIX_GUIDE.md for resolution steps.`
+        );
       }
 
       if (!tokenPrefix.startsWith('shpat_') && !tokenPrefix.startsWith('shpca_')) {
-        console.warn(
-          `⚠️ WARNING: Token doesn't start with expected prefix (shpat_ or shpca_). ` +
-          `Prefix: ${tokenPrefix}... Length: ${tokenLength}`
+        console.error(
+          `❌ CRITICAL ERROR: Invalid token prefix!`,
+          `Received: ${tokenPrefix}... Expected: shpat_... or shpca_...`,
+          `Length: ${tokenLength}`
+        );
+
+        throw new Error(
+          `Invalid token prefix: ${tokenPrefix}. ` +
+          `Valid Shopify tokens must start with 'shpat_' or 'shpca_'. ` +
+          `This indicates an app configuration issue in Shopify Partners Dashboard. ` +
+          `See SHOPIFY_APP_FIX_GUIDE.md for resolution steps.`
         );
       }
 
