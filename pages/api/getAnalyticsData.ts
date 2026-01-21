@@ -1,5 +1,5 @@
 import withMiddleware from "@/utils/middleware/withMiddleware";
-import clientProvider from "@/utils/clientProvider";
+import shopify from "@/utils/shopify";
 import { NextApiHandler } from "next";
 import { getDiscountData } from "@/utils/shopifyQueries";
 import prisma from "@/utils/prisma";
@@ -19,13 +19,18 @@ const handler: NextApiHandler = async (req, res) => {
     return res.status(400).send({ text: "We don't do that here." });
   }
 
-  const { client, shop, session } = await clientProvider.graphqlClient({
-    req,
-    res,
-    isOnline: true,
-  });
+  // Use the session provided by verifyRequest middleware
+  const session = req.user_session;
+
+  if (!session) {
+    console.error('✗ No session found in request context');
+    return res.status(401).json({ error: "Unauthorized", message: "No session found" });
+  }
 
   try {
+    // Create GraphQL client with the validated session
+    const client = new shopify.clients.Graphql({ session });
+
     const bundles = await prisma.bundle_discount_id.findMany();
     let data = [];
 
@@ -48,8 +53,8 @@ const handler: NextApiHandler = async (req, res) => {
     const discountData = JSON.stringify(data);
     return res.status(200).json(discountData);
   } catch (error) {
-    console.error("Exception while getting collections:", error);
-    return res.status(500).send("message: Error while getting collections");
+    console.error("Exception while getting analytics data:", error);
+    return res.status(500).send("message: Error while getting analytics data");
   }
 };
 
