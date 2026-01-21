@@ -90,6 +90,18 @@ const verifyRequest = async (req, res, next) => {
       console.log(`✓ Session validation successful (test query passed)`);
     } catch (testError) {
       console.error('✗ Session validation failed (test query):', testError.message);
+      console.error('This usually means the access token is invalid or expired.');
+
+      // If the token is invalid (401 from Shopify), delete the session to force reinstall
+      if (testError.message && testError.message.includes('401')) {
+        console.log(`🗑️  Deleting invalid session for shop: ${shop}`);
+        try {
+          await sessionHandler.deleteSession(offlineSessionId);
+          console.log(`✓ Invalid session deleted - user will need to reinstall`);
+        } catch (deleteError) {
+          console.error('Error deleting session:', deleteError);
+        }
+      }
 
       // Return 403 with reauthorization headers
       res.status(403);
