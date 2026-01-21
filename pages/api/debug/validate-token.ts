@@ -3,6 +3,20 @@ import prisma from "@/utils/prisma";
 import shopify from "@/utils/shopify";
 import { Session } from '@shopify/shopify-api';
 
+// Define the expected GraphQL response structure
+interface ShopQueryResponse {
+  data?: {
+    shop?: {
+      name: string;
+      email: string;
+      myshopifyDomain: string;
+      plan: {
+        displayName: string;
+      };
+    };
+  };
+}
+
 /**
  * Validates if the stored access token actually works with Shopify
  * Visit: /api/debug/validate-token?shop=YOUR_SHOP.myshopify.com
@@ -112,9 +126,12 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
         },
       });
 
+      // Type assert the response body to our expected structure
+      const responseBody = response.body as ShopQueryResponse;
+
       // Check if response has data
-      if (response.body && response.body.data && response.body.data.shop) {
-        const shopData = response.body.data.shop;
+      if (responseBody && responseBody.data && responseBody.data.shop) {
+        const shopData = responseBody.data.shop;
 
         results.checks.tokenValidation = {
           valid: true,
