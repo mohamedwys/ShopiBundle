@@ -1,6 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import shopify from "@/utils/shopify";
+import prisma from "@/utils/prisma";
 import { logAuthDebug } from "@/utils/authDebug";
+import crypto from 'crypto';
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
@@ -20,17 +22,39 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       return res.send("Invalid shop domain");
     }
 
-    console.log('Starting OAuth for shop:', sanitizedShop);
+    console.log('Starting cookieless OAuth for shop:', sanitizedShop);
 
-    await shopify.auth.begin({
-      shop: sanitizedShop,
-      callbackPath: '/api/auth/callback',
-      isOnline: false,
-      rawRequest: req,
-      rawResponse: res,
+    // Generate a random state for CSRF protection
+    const state = crypto.randomBytes(16).toString('hex');
+
+    // Store OAuth state in database (bypassing cookies)
+    await prisma.oauth_state.create({
+      data: {
+        state,
+        shop: sanitizedShop,
+        isOnline: false,
+      },
     });
 
-    console.log('=== AUTH BEGIN COMPLETE ===');
+    console.log('✓ OAuth state stored in database:', state);
+
+    // Build authorization URL manually
+    const scopes = process.env.SHOPIFY_API_SCOPES;
+    const redirectUri = `${process.env.SHOPIFY_APP_URL}/api/auth/callback`;
+    const apiKey = process.env.SHOPIFY_API_KEY;
+
+    const authUrl = `https://${sanitizedShop}/admin/oauth/authorize?` +
+      `client_id=${apiKey}&` +
+      `scope=${encodeURIComponent(scopes)}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `state=${state}&` +
+      `grant_options[]=per-user`;
+
+    console.log('Redirecting to Shopify OAuth URL');
+    console.log('Redirect URI:', redirectUri);
+
+    // Redirect to Shopify's OAuth authorization page
+    return res.redirect(authUrl);
 
   } catch (error) {
     console.error('=== AUTH BEGIN ERROR ===', error);

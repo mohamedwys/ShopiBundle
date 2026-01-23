@@ -26,6 +26,16 @@ model session {
   @@index([shop])
 }
 
+model oauth_state {
+  state     String   @id
+  shop      String
+  isOnline  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([shop])
+  @@index([createdAt])
+}
+
 // Automatic bundle generation data (DEPRECATED - use auto_bundle_rules)
 model auto_bundle_data {
   shop        String   @id

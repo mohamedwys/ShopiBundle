@@ -4,6 +4,8 @@ import { createBundleDefinition } from "@/utils/shopifyQueries/createBundleDefin
 import sessionHandler from "@/utils/sessionHandler";
 import shopify from "@/utils/shopify";
 import { logAuthDebug, validateShopifyRedirect } from "@/utils/authDebug";
+import crypto from 'crypto';
+import { Session } from '@shopify/shopify-api';
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
@@ -15,118 +17,172 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       validation.errors.forEach(error => console.error(`  - ${error}`));
     }
 
-    // Exchange code for OFFLINE access token
-    const callbackResponse = await shopify.auth.callback({
-      rawRequest: req,
-      rawResponse: res,
+    const { code, hmac, shop, state, host } = req.query;
+
+    if (!shop || typeof shop !== 'string') {
+      throw new Error('Missing shop parameter');
+    }
+
+    if (!code || typeof code !== 'string') {
+      throw new Error('Missing authorization code');
+    }
+
+    if (!state || typeof state !== 'string') {
+      throw new Error('Missing state parameter');
+    }
+
+    if (!hmac || typeof hmac !== 'string') {
+      throw new Error('Missing HMAC signature');
+    }
+
+    const sanitizedShop = shopify.utils.sanitizeShop(shop);
+
+    if (!sanitizedShop) {
+      throw new Error('Invalid shop domain');
+    }
+
+    console.log('Processing cookieless OAuth callback for shop:', sanitizedShop);
+
+    // Verify HMAC
+    const queryParams = { ...req.query };
+    delete queryParams.hmac;
+
+    const message = Object.keys(queryParams)
+      .sort()
+      .map(key => `${key}=${queryParams[key]}`)
+      .join('&');
+
+    const generatedHmac = crypto
+      .createHmac('sha256', process.env.SHOPIFY_API_SECRET!)
+      .update(message)
+      .digest('hex');
+
+    if (generatedHmac !== hmac) {
+      throw new Error('HMAC validation failed - request may be forged');
+    }
+
+    console.log('✓ HMAC validation passed');
+
+    // Verify state from database (CSRF protection)
+    const oauthState = await prisma.oauth_state.findUnique({
+      where: { state },
     });
 
-    const { session } = callbackResponse;
-
-    if (!session) {
-      throw new Error('No session returned from Shopify');
+    if (!oauthState) {
+      throw new Error('Invalid OAuth state - possible CSRF attack');
     }
 
-    // Validate session structure
-    if (!session.accessToken) {
-      throw new Error('Session is missing accessToken - OAuth flow failed');
+    if (oauthState.shop !== sanitizedShop) {
+      throw new Error('Shop mismatch in OAuth state');
     }
 
-    if (!session.shop) {
-      throw new Error('Session is missing shop domain');
+    console.log('✓ OAuth state verified from database');
+
+    // Clean up old OAuth states (older than 10 minutes)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    await prisma.oauth_state.deleteMany({
+      where: {
+        createdAt: {
+          lt: tenMinutesAgo,
+        },
+      },
+    });
+
+    // Delete the used state
+    await prisma.oauth_state.delete({
+      where: { state },
+    });
+
+    console.log('✓ OAuth state cleaned up');
+
+    // Exchange authorization code for access token
+    const tokenUrl = `https://${sanitizedShop}/admin/oauth/access_token`;
+    const tokenResponse = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: process.env.SHOPIFY_API_KEY,
+        client_secret: process.env.SHOPIFY_API_SECRET,
+        code,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      throw new Error(`Token exchange failed: ${tokenResponse.status} ${errorText}`);
     }
 
-    // Verify this is an offline session
-    if (session.isOnline) {
-      console.warn('WARNING: Received online session instead of offline session');
+    const tokenData = await tokenResponse.json();
+    const { access_token, scope } = tokenData;
+
+    if (!access_token) {
+      throw new Error('No access token received from Shopify');
     }
 
-    // CRITICAL: Validate token before storing
-    const tokenLength = session.accessToken.length;
-    const tokenPrefix = session.accessToken.substring(0, 6);
-    const tokenSuffix = session.accessToken.substring(tokenLength - 4);
+    console.log('✓ Access token received from Shopify');
 
-    console.log('Session received from Shopify:', {
+    // Validate token format
+    const tokenLength = access_token.length;
+    const tokenPrefix = access_token.substring(0, 6);
+
+    console.log('Token info:', {
+      length: tokenLength,
+      prefix: tokenPrefix + '...',
+    });
+
+    if (!tokenPrefix.startsWith('shpat_') && !tokenPrefix.startsWith('shpca_')) {
+      throw new Error(`Invalid token prefix: ${tokenPrefix}`);
+    }
+
+    if (tokenLength < 30) {
+      throw new Error(`Token too short: ${tokenLength} chars`);
+    }
+
+    console.log('✓ Token validation passed');
+
+    // Create session manually
+    const sessionId = shopify.session.getOfflineId(sanitizedShop);
+    const session = new Session({
+      id: sessionId,
+      shop: sanitizedShop,
+      state: state,
+      isOnline: false,
+      accessToken: access_token,
+      scope: scope,
+    });
+
+    console.log('Session created:', {
       id: session.id,
       shop: session.shop,
       isOnline: session.isOnline,
       scope: session.scope,
-      tokenInfo: {
-        length: tokenLength,
-        prefix: tokenPrefix + '...',
-        suffix: '...' + tokenSuffix,
-        looksValid: tokenLength > 50 && (tokenPrefix.startsWith('shpat_') || tokenPrefix.startsWith('shpca_')),
-      },
     });
-
-    // Validate token format - CORRECTED VALIDATION
-    // Shopify returns different token formats:
-    // - 38-character tokens: shpat_... (newer format for some apps)
-    // - 100+ character tokens: shpat_... or shpca_... (standard format)
-    console.log('🔍 TOKEN VALIDATION:');
-
-    // Most important: Check prefix
-    if (!tokenPrefix.startsWith('shpat_') && !tokenPrefix.startsWith('shpca_')) {
-      console.error(
-        `❌ CRITICAL ERROR: Invalid token prefix!`,
-        `Received: ${tokenPrefix}... Expected: shpat_... or shpca_...`
-      );
-
-      throw new Error(
-        `INVALID TOKEN PREFIX: ${tokenPrefix}\n\n` +
-        `Valid Shopify tokens must start with 'shpat_' or 'shpca_'.\n` +
-        `This indicates an app configuration issue in Shopify Partners Dashboard.`
-      );
-    }
-
-    // Check minimum length (tokens should be at least 30 chars)
-    if (tokenLength < 30) {
-      console.error(
-        `❌ CRITICAL ERROR: Token too short!`,
-        `Length: ${tokenLength} characters (minimum 30 expected).`
-      );
-
-      throw new Error(`Invalid token: too short (${tokenLength} chars). Token may be corrupted.`);
-    }
-
-    // Log token format for monitoring
-    if (tokenLength === 38) {
-      console.log(`✓ Token validation PASSED: 38-char shpat_ format (valid Shopify token)`);
-    } else if (tokenLength > 100) {
-      console.log(`✓ Token validation PASSED: ${tokenLength}-char format (standard Shopify token)`);
-    } else {
-      console.log(`✓ Token validation PASSED: ${tokenLength}-char with valid prefix (accepting)`);
-    }
 
     // Store the offline session
     await sessionHandler.storeSession(session);
     console.log('✓ Session stored with ID:', session.id);
 
-    // Verify session was stored and can be retrieved
+    // Verify session was stored
     const storedSession = await sessionHandler.loadSession(session.id);
-    if (!storedSession) {
-      throw new Error(`Session was not stored correctly. ID: ${session.id}`);
+    if (!storedSession || !storedSession.accessToken) {
+      throw new Error('Session storage verification failed');
     }
 
-    if (!storedSession.accessToken) {
-      throw new Error(`Stored session is missing accessToken. ID: ${session.id}`);
-    }
-
-    console.log('✓ Session verified in database with accessToken');
-
-    const { shop } = session;
+    console.log('✓ Session verified in database');
 
     // Create bundle definition
     try {
       const client = new shopify.clients.Graphql({ session });
       await createBundleDefinition(client);
       console.log('✓ Bundle definition created');
-      
+
       // Update store record
       await prisma.active_stores.upsert({
-        where: { shop },
+        where: { shop: sanitizedShop },
         create: {
-          shop,
+          shop: sanitizedShop,
           isActive: true,
         },
         update: {
@@ -139,11 +195,11 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     } catch (defError) {
       console.error('Bundle definition creation failed:', defError);
       const errorMessage = defError instanceof Error ? defError.message : 'Unknown error';
-      
+
       await prisma.active_stores.upsert({
-        where: { shop },
+        where: { shop: sanitizedShop },
         create: {
-          shop,
+          shop: sanitizedShop,
           isActive: true,
           setupError: errorMessage,
         },
@@ -153,47 +209,47 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       });
     }
 
-    // Get host from query for redirect
-    const host = req.query.host as string;
-    
-    // Redirect directly to the app
-    const redirectUrl = host 
-      ? `/?shop=${shop}&host=${host}`
-      : `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
-    
+    // Redirect to app
+    const redirectUrl = host && typeof host === 'string'
+      ? `/?shop=${sanitizedShop}&host=${host}`
+      : `https://${sanitizedShop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
+
     console.log('=== AUTH CALLBACK SUCCESS ===');
     console.log('Redirecting to:', redirectUrl);
-    
+
     return res.redirect(redirectUrl);
 
   } catch (error) {
     console.error('=== AUTH CALLBACK ERROR ===', error);
-    
+
     const { shop } = req.query;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     if (shop && typeof shop === 'string') {
-      try {
-        await prisma.active_stores.upsert({
-          where: { shop },
-          create: {
-            shop,
-            isActive: false,
-            lastError: errorMessage,
-            lastErrorAt: new Date(),
-          },
-          update: {
-            lastError: errorMessage,
-            lastErrorAt: new Date(),
-            isActive: false,
-          },
-        });
-      } catch (dbError) {
-        console.error('Failed to update error in DB:', dbError);
+      const sanitizedShop = shopify.utils.sanitizeShop(shop);
+      if (sanitizedShop) {
+        try {
+          await prisma.active_stores.upsert({
+            where: { shop: sanitizedShop },
+            create: {
+              shop: sanitizedShop,
+              isActive: false,
+              lastError: errorMessage,
+              lastErrorAt: new Date(),
+            },
+            update: {
+              lastError: errorMessage,
+              lastErrorAt: new Date(),
+              isActive: false,
+            },
+          });
+        } catch (dbError) {
+          console.error('Failed to update error in DB:', dbError);
+        }
+
+        // Restart auth flow
+        return res.redirect(`/api?shop=${sanitizedShop}`);
       }
-      
-      // Restart auth flow
-      return res.redirect(`/api?shop=${shop}`);
     }
 
     return res.status(500).send(errorMessage);
