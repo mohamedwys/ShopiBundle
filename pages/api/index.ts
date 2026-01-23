@@ -36,16 +36,11 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       return res.redirect(`/exitframe?${queryParams}`);
     }
 
-    console.log('Starting OAuth for shop:', sanitizedShop);
+    console.log('Redirecting to auth endpoint for shop:', sanitizedShop);
 
-    // Start OAuth - this should only run outside iframe
-    await shopify.auth.begin({
-      shop: sanitizedShop,
-      callbackPath: '/api/auth/callback',
-      isOnline: false,
-      rawRequest: req,
-      rawResponse: res,
-    });
+    // Redirect to dedicated auth endpoint
+    const authUrl = `/api/auth?shop=${sanitizedShop}${host && typeof host === 'string' ? `&host=${host}` : ''}`;
+    return res.redirect(authUrl);
 
   } catch (e) {
     console.error(`---> Error at /api/index`, e);
@@ -79,6 +74,12 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     
     res.status(500).send(`Authentication error: ${error.message}`);
   }
+};
+
+export const config = {
+  api: {
+    externalResolver: true,
+  },
 };
 
 export default handler;

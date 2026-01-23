@@ -22,6 +22,8 @@ model session {
   id      String  @id
   content String? //MySQL requires adding @db.Text
   shop    String?
+
+  @@index([shop])
 }
 
 // Automatic bundle generation data (DEPRECATED - use auto_bundle_rules)

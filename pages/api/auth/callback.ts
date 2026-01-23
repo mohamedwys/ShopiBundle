@@ -3,11 +3,17 @@ import prisma from "@/utils/prisma";
 import { createBundleDefinition } from "@/utils/shopifyQueries/createBundleDefinition";
 import sessionHandler from "@/utils/sessionHandler";
 import shopify from "@/utils/shopify";
+import { logAuthDebug, validateShopifyRedirect } from "@/utils/authDebug";
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
-    console.log('=== AUTH CALLBACK START ===');
-    console.log('Query params:', req.query);
+    logAuthDebug('AUTH CALLBACK', req);
+
+    const validation = validateShopifyRedirect(req);
+    if (!validation.valid) {
+      console.error('OAuth callback validation failed:', validation.errors);
+      validation.errors.forEach(error => console.error(`  - ${error}`));
+    }
 
     // Exchange code for OFFLINE access token
     const callbackResponse = await shopify.auth.callback({
@@ -192,6 +198,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     return res.status(500).send(errorMessage);
   }
+};
+
+export const config = {
+  api: {
+    bodyParser: false,
+    externalResolver: true,
+  },
 };
 
 export default handler;

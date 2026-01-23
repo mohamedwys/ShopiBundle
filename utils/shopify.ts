@@ -55,7 +55,6 @@ const shopify = shopifyApi({
   logger: { level: isDev ? 0 : 0 },
 
   // CRITICAL: Use offline tokens for persistent API access
-  // Online tokens expire and are user-specific, offline tokens are shop-specific and permanent
   useOnlineTokens: false,
 
   // Configure session storage to use our database
