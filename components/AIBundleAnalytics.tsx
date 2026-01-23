@@ -93,12 +93,12 @@ export default function AIBundleAnalytics({ shop, productId }: AIBundleAnalytics
       </IndexTable.Cell>
       <IndexTable.Cell>
         <Badge tone={variant.ctr > 0.1 ? "success" : "attention"}>
-          {(variant.ctr * 100).toFixed(2)}%
+          {`${(variant.ctr * 100).toFixed(2)}%`}
         </Badge>
       </IndexTable.Cell>
       <IndexTable.Cell>
         <Badge tone={variant.conversionRate > 0.05 ? "success" : "attention"}>
-          {(variant.conversionRate * 100).toFixed(2)}%
+          {`${(variant.conversionRate * 100).toFixed(2)}%`}
         </Badge>
       </IndexTable.Cell>
     </IndexTable.Row>

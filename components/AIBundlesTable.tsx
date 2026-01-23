@@ -100,12 +100,12 @@ export default function AIBundlesTable({ shop, productId }: AIBundlesTableProps)
       </IndexTable.Cell>
       <IndexTable.Cell>
         <Badge tone={bundle.confidenceScore > 0.5 ? "success" : "attention"}>
-          {(bundle.confidenceScore * 100).toFixed(1)}%
+          {`${(bundle.confidenceScore * 100).toFixed(1)}%`}
         </Badge>
       </IndexTable.Cell>
       <IndexTable.Cell>
         <Text variant="bodyMd" as="span">
-          {(bundle.support * 100).toFixed(2)}%
+          {`${(bundle.support * 100).toFixed(2)}%`}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
@@ -118,9 +118,7 @@ export default function AIBundlesTable({ shop, productId }: AIBundlesTableProps)
           <Badge tone={bundle.isActive ? "success" : "critical"}>
             {bundle.isActive ? "Active" : "Inactive"}
           </Badge>
-          {bundle.isManualOverride && (
-            <Badge tone="info">Locked</Badge>
-          )}
+          {bundle.isManualOverride && <Badge tone="info">Locked</Badge>}
         </InlineStack>
       </IndexTable.Cell>
       <IndexTable.Cell>
