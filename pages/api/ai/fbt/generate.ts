@@ -122,15 +122,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (bundleResult) {
           bundleMetaobjectId = bundleResult.bundleId;
 
-          const discountResult = await discountCreate(
-            client,
-            bundleResult.discountTitle,
-            bundleData.discount,
-            bundleData.products.length
-          );
+          const discountResult = await discountCreate(client, {
+            title: bundleResult.discountTitle,
+            discount: bundleData.discount,
+            products: bundleData.products,
+            minProducts: String(bundleData.products.length),
+          });
 
           if (discountResult) {
-            discountId = discountResult.discountId;
+            discountId = discountResult;
 
             await prisma.bundle_discount_id.create({
               data: {
