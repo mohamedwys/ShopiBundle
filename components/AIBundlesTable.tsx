@@ -10,8 +10,7 @@ import {
   BlockStack,
   InlineStack,
 } from "@shopify/polaris";
-import type { IndexTableHeading } from "@shopify/polaris";
-import useFetch from "@/hooks/useFetch";
+import useFetch from "./hooks/useFetch";
 
 interface AIBundle {
   id: string;
@@ -77,7 +76,7 @@ export default function AIBundlesTable({ shop, productId }: AIBundlesTableProps)
     plural: "AI bundles",
   };
 
-  const headings: IndexTableHeading[] = [
+  const headings = [
     { title: "Product ID" },
     { title: "Bundled Products" },
     { title: "Confidence" },

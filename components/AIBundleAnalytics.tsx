@@ -7,8 +7,7 @@ import {
   Box,
   BlockStack,
 } from "@shopify/polaris";
-import type { IndexTableHeading } from "@shopify/polaris";
-import useFetch from "@/hooks/useFetch";
+import useFetch from "./hooks/useFetch";
 
 interface VariantAnalytics {
   variantGroupId: string;
@@ -55,7 +54,7 @@ export default function AIBundleAnalytics({ shop, productId }: AIBundleAnalytics
     plural: "variants",
   };
 
-  const headings: IndexTableHeading[] = [
+  const headings = [
     { title: "Variant ID" },
     { title: "Impressions" },
     { title: "Clicks" },

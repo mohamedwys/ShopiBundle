@@ -10,7 +10,7 @@ import {
   Text,
   Checkbox,
 } from "@shopify/polaris";
-import useFetch from "@/hooks/useFetch";
+import useFetch from "./hooks/useFetch";
 
 interface AIFBTConfigProps {
   shop: string;
