@@ -54,16 +54,6 @@ export default function AIBundleAnalytics({ shop, productId }: AIBundleAnalytics
     plural: "variants",
   };
 
-  const headings = [
-    { title: "Variant ID" },
-    { title: "Impressions" },
-    { title: "Clicks" },
-    { title: "Add to Cart" },
-    { title: "Purchases" },
-    { title: "CTR" },
-    { title: "Conversion" },
-  ];
-
   const rowMarkup = analytics.map((variant, index) => (
     <IndexTable.Row id={variant.variantGroupId} key={variant.variantGroupId} position={index}>
       <IndexTable.Cell>
@@ -115,7 +105,15 @@ export default function AIBundleAnalytics({ shop, productId }: AIBundleAnalytics
         <IndexTable
           resourceName={resourceName}
           itemCount={analytics.length}
-          headings={headings}
+          headings={[
+            { title: "Variant ID" },
+            { title: "Impressions" },
+            { title: "Clicks" },
+            { title: "Add to Cart" },
+            { title: "Purchases" },
+            { title: "CTR" },
+            { title: "Conversion" },
+          ]}
           selectable={false}
           loading={loading}
         >

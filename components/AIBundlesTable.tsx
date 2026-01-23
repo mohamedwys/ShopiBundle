@@ -76,16 +76,6 @@ export default function AIBundlesTable({ shop, productId }: AIBundlesTableProps)
     plural: "AI bundles",
   };
 
-  const headings = [
-    { title: "Product ID" },
-    { title: "Bundled Products" },
-    { title: "Confidence" },
-    { title: "Support" },
-    { title: "Lift" },
-    { title: "Status" },
-    { title: "Actions" },
-  ];
-
   const rowMarkup = bundles.map((bundle, index) => (
     <IndexTable.Row id={bundle.id} key={bundle.id} position={index}>
       <IndexTable.Cell>
@@ -166,7 +156,15 @@ export default function AIBundlesTable({ shop, productId }: AIBundlesTableProps)
       <IndexTable
         resourceName={resourceName}
         itemCount={bundles.length}
-        headings={headings}
+        headings={[
+          { title: "Product ID" },
+          { title: "Bundled Products" },
+          { title: "Confidence" },
+          { title: "Support" },
+          { title: "Lift" },
+          { title: "Status" },
+          { title: "Actions" },
+        ]}
         selectable={false}
         loading={loading}
       >
