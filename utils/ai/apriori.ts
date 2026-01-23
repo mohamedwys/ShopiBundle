@@ -242,7 +242,7 @@ export class AprioriAlgorithm {
     }
 
     const allSuggestions: FBTSuggestion[] = [];
-    for (const [productId, suggestions] of suggestionsByProduct) {
+    Array.from(suggestionsByProduct.entries()).forEach(([productId, suggestions]) => {
       const topSuggestions = suggestions
         .sort((a, b) => {
           if (b.confidence !== a.confidence)
@@ -253,7 +253,7 @@ export class AprioriAlgorithm {
         .slice(0, maxPerProduct);
 
       allSuggestions.push(...topSuggestions);
-    }
+    });
 
     return allSuggestions;
   }
