@@ -60,3 +60,71 @@ model bundle_discount_id {
   discountId String
   shop       String
 }
+
+// AI-generated FBT bundles
+model ai_fbt_bundles {
+  id                    String   @id @default(cuid())
+  shop                  String
+  productId             String
+  bundledProductIds     String[]
+  confidenceScore       Float
+  support               Float
+  lift                  Float
+  generatedAt           DateTime @default(now())
+  isActive              Boolean  @default(true)
+  source                String   @default("AI")
+  variantGroupId        String?
+  bundleMetaobjectId    String?
+  discountId            String?
+  isManualOverride      Boolean  @default(false)
+  lastUpdatedAt         DateTime @default(now())
+
+  @@index([shop, productId])
+  @@index([shop, isActive])
+}
+
+// Event tracking for AI bundles
+model ai_bundle_events {
+  id             String   @id @default(cuid())
+  shop           String
+  bundleId       String
+  productId      String
+  eventType      String
+  variantGroupId String?
+  sessionId      String?
+  customerId     String?
+  createdAt      DateTime @default(now())
+  metadata       Json?
+
+  @@index([shop, bundleId])
+  @@index([shop, eventType])
+  @@index([createdAt])
+}
+
+// A/B test variant assignments
+model ai_bundle_ab_assignments {
+  id             String   @id @default(cuid())
+  shop           String
+  sessionId      String
+  productId      String
+  variantGroupId String
+  assignedAt     DateTime @default(now())
+  expiresAt      DateTime
+
+  @@index([sessionId, productId])
+  @@index([expiresAt])
+}
+
+// AI FBT configuration per shop
+model ai_fbt_config {
+  shop                  String   @id
+  isEnabled             Boolean  @default(false)
+  minSupport            Float    @default(0.01)
+  minConfidence         Float    @default(0.3)
+  minLift               Float    @default(1.0)
+  maxBundlesPerProduct  Int      @default(3)
+  lookbackDays          Int      @default(90)
+  lastGeneratedAt       DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @default(now())
+}

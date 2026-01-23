@@ -1,0 +1,101 @@
+{% assign bundle_id = block.settings.bundle_id %}
+{% assign product_id = product.id %}
+
+<div class="ai-bundle-container" data-product-id="{{ product_id }}" {{ block.shopify_attributes }}>
+  <style>
+    .ai-bundle-container {
+      margin: 2rem 0;
+      padding: 1.5rem;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background: #f9f9f9;
+    }
+
+    .ai-bundle-item {
+      margin-bottom: 1.5rem;
+    }
+
+    .ai-bundle-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .ai-bundle-header h3 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .ai-badge {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .ai-bundle-products {
+      display: flex;
+      gap: 1rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+
+    .ai-bundle-product {
+      flex: 0 0 auto;
+      width: 120px;
+      text-align: center;
+    }
+
+    .ai-bundle-product img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+    }
+
+    .ai-bundle-product span {
+      display: block;
+      font-size: 0.875rem;
+      line-height: 1.2;
+    }
+
+    .ai-bundle-add-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .ai-bundle-add-btn:hover {
+      background: #333;
+    }
+  </style>
+</div>
+
+<script src="{{ 'ai-bundle.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "AI Bundle",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "bundle_id",
+      "label": "Bundle ID",
+      "info": "Leave empty to auto-load AI bundles for current product"
+    }
+  ]
+}
+{% endschema %}

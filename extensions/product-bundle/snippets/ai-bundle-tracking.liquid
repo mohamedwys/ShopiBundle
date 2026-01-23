@@ -1,0 +1,33 @@
+<script>
+(function() {
+  if (typeof Shopify !== 'undefined' && Shopify.checkout) {
+    const checkoutData = {{ checkout | json }};
+    const lineItems = checkoutData.line_items || [];
+
+    lineItems.forEach(item => {
+      if (item.properties && item.properties._bundle_id) {
+        const bundleId = item.properties._bundle_id;
+        const productId = item.product_id;
+        const variantGroupId = item.properties._variant_group_id;
+
+        if (window.aiBundleTracking) {
+          window.aiBundleTracking.trackPurchase(bundleId, productId, variantGroupId);
+        } else {
+          fetch('/apps/proxy/ai/events/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              shop: '{{ shop.permanent_domain }}',
+              bundleId: bundleId,
+              productId: String(productId),
+              eventType: 'purchase',
+              variantGroupId: variantGroupId,
+              sessionId: sessionStorage.getItem('ai_bundle_session_id'),
+            }),
+          }).catch(console.error);
+        }
+      }
+    });
+  }
+})();
+</script>
