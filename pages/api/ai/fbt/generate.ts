@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import withMiddleware from "@/utils/middleware/withMiddleware";
 import { PrismaClient } from "@prisma/client";
-import { getOfflineClient } from "@/utils/clientProvider";
+import clientProvider from "@/utils/clientProvider";
 import { getOrders } from "@/utils/shopifyQueries/getOrders";
 import { AprioriAlgorithm, Transaction } from "@/utils/ai/apriori";
 import { createBundle } from "@/utils/shopifyQueries/createBundle";
@@ -29,7 +29,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: "AI FBT is not enabled for this shop" });
     }
 
-    const client = await getOfflineClient(shop);
+    const { client } = await clientProvider.offline.graphqlClient({ shop });
     if (!client) {
       return res.status(500).json({ error: "Failed to get Shopify client" });
     }
