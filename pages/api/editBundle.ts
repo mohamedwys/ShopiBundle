@@ -29,6 +29,12 @@ const handler: NextApiHandler = async (req, res) => {
         },
       });
 
+      // Check if discount data exists
+      if (!discountData) {
+        console.error(`No discount record found for bundle: ${data.id}`);
+        return res.status(404).send("message: Bundle discount record not found");
+      }
+
       // If products changed, update the discount with new products
       if (data.products && data.products.length > 0) {
         const { discountDelete, discountCreate } = await import(

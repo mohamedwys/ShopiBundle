@@ -165,7 +165,7 @@ const handler: NextApiHandler = async (req, res) => {
       },
     };
 
-    return res.status(200).json(JSON.stringify(response));
+    return res.status(200).json(response);
   } catch (error) {
     console.error("Exception while getting enhanced analytics:", error);
     return res.status(500).send("message: Error while getting enhanced analytics");

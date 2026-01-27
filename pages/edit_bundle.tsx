@@ -94,7 +94,7 @@ const EditBundlePage: NextPage = () => {
         body: JSON.stringify({
           id: id,
         }),
-      }).then(async (res) => JSON.parse(await res.json()));
+      }).then((res) => res.json());
 
       let values: Fieldvalues = {};
       for (let field of data.fields) {
@@ -114,7 +114,7 @@ const EditBundlePage: NextPage = () => {
           body: JSON.stringify({
             id: productId,
           }),
-        }).then(async (res) => JSON.parse(await res.json()));
+        }).then((res) => res.json());
 
         productsData.push({
           id: data.id,
@@ -162,7 +162,7 @@ const EditBundlePage: NextPage = () => {
           body: JSON.stringify({
             id: product.id,
           }),
-        }).then(async (res) => JSON.parse(await res.json()));
+        }).then((res) => res.json());
 
         newProducts.push({
           id: data.id,

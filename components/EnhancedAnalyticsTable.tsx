@@ -31,7 +31,7 @@ export default function EnhancedAnalyticsTable() {
         }),
       });
 
-      const analyticsData = JSON.parse(await response.json());
+      const analyticsData = await response.json();
       setData(analyticsData);
     } catch (error) {
       console.error("Error loading analytics:", error);

@@ -50,8 +50,7 @@ const handler: NextApiHandler = async (req, res) => {
         });
       }
     }
-    const discountData = JSON.stringify(data);
-    return res.status(200).json(discountData);
+    return res.status(200).json(data);
   } catch (error) {
     console.error("Exception while getting analytics data:", error);
     return res.status(500).send("message: Error while getting analytics data");

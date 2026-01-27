@@ -127,34 +127,52 @@
       .catch(console.error);
   }
 
-  function handleAddToCart(bundle) {
+  async function handleAddToCart(bundle) {
     trackEvent(bundle.id, bundle.productId, 'add_to_cart', {
       variantGroupId: bundle.variantGroupId,
     });
 
     if (bundle.bundleMetaobjectId) {
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = '/cart/add';
+      try {
+        const allProductIds = [bundle.productId, ...bundle.bundledProductIds];
 
-      const allProductIds = [bundle.productId, ...bundle.bundledProductIds];
-      allProductIds.forEach(productId => {
-        fetch(`/products/${productId}.js`)
-          .then(res => res.json())
-          .then(product => {
-            const variantId = product.variants[0].id;
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'items[][id]';
-            input.value = variantId;
-            form.appendChild(input);
-          });
-      });
+        // Fetch all products in parallel and wait for all to complete
+        const productPromises = allProductIds.map(productId =>
+          fetch(`/products/${productId}.js`).then(res => res.json())
+        );
 
-      setTimeout(() => {
-        document.body.appendChild(form);
-        form.submit();
-      }, 500);
+        const products = await Promise.all(productPromises);
+
+        // Build cart items array with bundle properties
+        const items = products.map(product => ({
+          id: product.variants[0].id,
+          quantity: 1,
+          properties: {
+            '_bundle_id': bundle.id,
+            '_variant_group_id': bundle.variantGroupId || ''
+          }
+        }));
+
+        // Use Cart API for better reliability
+        const response = await fetch('/cart/add.js', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items })
+        });
+
+        if (response.ok) {
+          // Redirect to cart or trigger cart drawer
+          if (window.Shopify?.theme?.cartDrawer) {
+            document.dispatchEvent(new CustomEvent('cart:open'));
+          } else {
+            window.location.href = '/cart';
+          }
+        } else {
+          console.error('Failed to add bundle to cart');
+        }
+      } catch (error) {
+        console.error('Error adding bundle to cart:', error);
+      }
     }
   }
 

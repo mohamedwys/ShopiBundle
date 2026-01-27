@@ -27,7 +27,7 @@ export default function AnalyticsTable() {
         return;
       }
 
-      let data = JSON.parse(await response.json());
+      let data = await response.json();
 
       let sales = 0;
       setRows(

@@ -22,8 +22,7 @@ const handler: NextApiHandler = async (req, res) => {
     const client = new shopify.clients.Graphql({ session });
 
     const response = await getProductTags(client);
-    const tags = JSON.stringify(response);
-    return res.status(200).json(tags);
+    return res.status(200).json(response);
   } catch (error) {
     console.error("Exception while getting product tags:", error);
     return res.status(500).send("message: Error while getting product tags");

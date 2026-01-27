@@ -14,3 +14,8 @@ scopes = "write_metaobjects,read_metaobjects,write_metaobject_definitions,read_p
 redirect_urls = [
     "https://shopi-bundle.vercel.app/api/auth/callback"
 ]
+
+[app_proxy]
+url = "https://shopi-bundle.vercel.app/api/proxy_route"
+subpath = "proxy"
+prefix = "apps"

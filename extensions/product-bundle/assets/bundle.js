@@ -115,8 +115,9 @@
 
     async fetchBundlesForProduct(productId) {
       try {
-        // This would call your app's proxy route to get bundles
-        const response = await fetch(`/apps/shopibundle/bundles-for-product?product_id=${productId}`);
+        // Call app proxy route to get bundles for this product
+        const shop = window.Shopify?.shop || '';
+        const response = await fetch(`/apps/proxy/bundles-for-product?product_id=${productId}&shop=${shop}`);
         if (response.ok) {
           const bundles = await response.json();
           if (bundles.length > 0) {

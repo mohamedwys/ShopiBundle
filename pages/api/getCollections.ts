@@ -22,8 +22,7 @@ const handler: NextApiHandler = async (req, res) => {
     const client = new shopify.clients.Graphql({ session });
 
     const response = await getCollections(client);
-    const collections = JSON.stringify(response);
-    return res.status(200).json(collections);
+    return res.status(200).json(response);
   } catch (error) {
     console.error("Exception while getting collections:", error);
     return res.status(500).send("message: Error while getting collections");

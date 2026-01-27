@@ -18,8 +18,7 @@ const handler: NextApiHandler = async (req, res) => {
   try {
     const data = JSON.parse(req.body);
     const response = await getBundle(client, data.id);
-    const bundle = JSON.stringify(response);
-    return res.status(200).json(bundle);
+    return res.status(200).json(response);
   } catch (error) {
     console.error("Exception while getting bundle:", error);
     return res.status(500).send("message: Error while getting bundle");

@@ -10,6 +10,7 @@ import { getProductTags } from "./getProductTags";
 import { discountCreate } from "./discountCreate";
 import { discountDelete } from "./discountDelete";
 import { discountUpdate } from "./discountUpdate";
+import { discountToggle } from "./discountToggle";
 import { getProductsByCollection } from "./getProductsByCollection";
 import { getDiscountData } from "./getDiscountData";
 
@@ -26,6 +27,7 @@ export {
   discountCreate,
   discountDelete,
   discountUpdate,
+  discountToggle,
   getProductsByCollection,
   getDiscountData,
 };

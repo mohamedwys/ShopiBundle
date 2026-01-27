@@ -65,11 +65,11 @@ const AutoBundlesV2Page = () => {
       // Load collections and tags for create form
       const collectionsData = await fetch("/api/getCollections", {
         method: "POST",
-      }).then(async (res) => JSON.parse(await res.json()));
+      }).then((res) => res.json());
 
       const tagsData = await fetch("/api/getProductTags", {
         method: "POST",
-      }).then(async (res) => JSON.parse(await res.json()));
+      }).then((res) => res.json());
 
       setCollections(collectionsData.edges);
       setProductTags(tagsData.edges);

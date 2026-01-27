@@ -25,15 +25,25 @@ const handler: NextApiHandler = async (req, res) => {
       let deleteDiscountIds = [];
 
       for (const id of data.ids) {
-        const deletedDiscountId = await prisma.bundle_discount_id.delete({
-          where: {
-            bundleId: id,
-          },
-        });
-        deleteDiscountIds.push(deletedDiscountId.discountId);
+        try {
+          const deletedDiscountId = await prisma.bundle_discount_id.delete({
+            where: {
+              bundleId: id,
+            },
+          });
+          if (deletedDiscountId?.discountId) {
+            deleteDiscountIds.push(deletedDiscountId.discountId);
+          }
+        } catch (deleteError) {
+          // Log but continue - bundle may not have discount record
+          console.warn(`No discount record found for bundle ${id}, skipping discount deletion`);
+        }
       }
 
-      await discountDelete(client, deleteDiscountIds);
+      // Only delete discounts if we have any
+      if (deleteDiscountIds.length > 0) {
+        await discountDelete(client, deleteDiscountIds);
+      }
 
       return res.status(200).send("message: Bundle deleted succesfully");
     }
