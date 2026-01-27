@@ -34,9 +34,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       sessions: sessions.map(s => s.id),
       store: store ? {
         isActive: store.isActive,
-        scope: store.scope,
         setupError: store.setupError,
         lastError: store.lastError,
+        lastErrorAt: store.lastErrorAt,
       } : null,
     });
   } catch (error: any) {
