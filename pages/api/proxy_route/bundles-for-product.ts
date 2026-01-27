@@ -1,6 +1,5 @@
 import { NextApiHandler } from "next";
 import clientProvider from "@/utils/clientProvider";
-import prisma from "@/utils/prisma";
 
 /**
  * Proxy route to find bundles containing a specific product
@@ -13,16 +12,27 @@ const handler: NextApiHandler = async (req, res) => {
 
   try {
     const { product_id } = req.query;
-    const shop = req.query.shop || req.headers["x-shopify-shop"];
+    const shop = req.query.shop || req.headers["x-shopify-shop-domain"];
 
     if (!product_id || !shop) {
       return res.status(400).json({ error: "Missing product_id or shop" });
     }
 
+    console.log(`Fetching bundles for shop: ${shop}, product: ${product_id}`);
+
     // Get offline client for the shop
-    const { client } = await clientProvider.offline.graphqlClient({
-      shop: shop as string,
-    });
+    let client;
+    try {
+      const result = await clientProvider.offline.graphqlClient({
+        shop: shop as string,
+      });
+      client = result.client;
+    } catch (sessionError: any) {
+      // Session not found - shop may have uninstalled or not completed OAuth
+      console.warn(`No session for shop ${shop}: ${sessionError.message}`);
+      // Return empty array instead of error for storefront
+      return res.status(200).json([]);
+    }
 
     // Query all bundles and filter by product
     const query = `
