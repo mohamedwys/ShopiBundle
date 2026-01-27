@@ -11,6 +11,11 @@ import { logger, createBundleLogger } from '@/lib/monitoring/logger';
 import { BundleMetrics } from '@/lib/monitoring/metrics';
 import { isFeatureEnabled } from '@/config/feature-flags';
 import { PricingService } from './pricing.service';
+import {
+  getShopifyIntegrationService,
+  ShopifyIntegrationService,
+  BundleShopifyData,
+} from './shopify-integration.service';
 
 // Types
 export interface CreateBundleInput {
@@ -99,9 +104,11 @@ export interface PaginatedBundles {
 
 export class BundleService {
   private pricingService: PricingService;
+  private shopifyIntegration: ShopifyIntegrationService;
 
   constructor() {
     this.pricingService = new PricingService();
+    this.shopifyIntegration = getShopifyIntegrationService();
   }
 
   /**
@@ -283,6 +290,7 @@ export class BundleService {
 
   /**
    * Update a bundle
+   * Syncs changes with Shopify if bundle is already published (ACTIVE)
    */
   async updateBundle(
     bundleId: string,
@@ -291,9 +299,14 @@ export class BundleService {
   ): Promise<BundleWithPricing> {
     const log = createBundleLogger(bundleId, shop);
 
-    // Check bundle exists
+    // Check bundle exists with current data
     const existing = await prisma.bundle.findFirst({
       where: { id: bundleId, shop },
+      include: {
+        components: { orderBy: { displayOrder: 'asc' } },
+        pricingRules: { where: { isActive: true } },
+        discounts: true,
+      },
     });
 
     if (!existing) {
@@ -337,6 +350,44 @@ export class BundleService {
       });
     }
 
+    // Sync with Shopify if bundle is active and has Shopify resources
+    const isActive = bundle.status === 'ACTIVE';
+    const hasShopifyResources = existing.shopifyMetaobjectId || existing.discounts.length > 0;
+
+    if (isActive && hasShopifyResources) {
+      log.info('Syncing updates with Shopify');
+
+      // Get the updated discount percentage
+      const discountPercent = input.discountPercent !== undefined
+        ? input.discountPercent
+        : (existing.pricingRules[0]?.discountValue
+          ? Number(existing.pricingRules[0].discountValue)
+          : 0);
+
+      const bundleShopifyData: BundleShopifyData = {
+        id: bundle.id,
+        shop: bundle.shop,
+        name: bundle.name,
+        title: bundle.title,
+        description: bundle.description,
+        discountPercent,
+        components: bundle.components.map((c) => ({
+          shopifyProductId: c.shopifyProductId,
+          quantity: c.quantity,
+        })),
+      };
+
+      const result = await this.shopifyIntegration.onBundleUpdate(
+        bundleShopifyData,
+        existing.shopifyMetaobjectId,
+        existing.discounts[0]?.shopifyDiscountId || null
+      );
+
+      if (result.errors.length > 0) {
+        log.warn('Shopify sync completed with errors', { errors: result.errors });
+      }
+    }
+
     log.info('Bundle updated');
 
     return this.enrichBundleWithPricing(bundle);
@@ -344,6 +395,7 @@ export class BundleService {
 
   /**
    * Delete a bundle
+   * Cleans up associated Shopify resources (metaobject and discount)
    */
   async deleteBundle(bundleId: string, shop: string): Promise<void> {
     const log = createBundleLogger(bundleId, shop);
@@ -355,6 +407,25 @@ export class BundleService {
 
     if (!bundle) {
       throw new Error('Bundle not found');
+    }
+
+    // Delete Shopify resources first
+    const shopifyDiscountId = bundle.discounts[0]?.shopifyDiscountId || null;
+    const shopifyMetaobjectId = bundle.shopifyMetaobjectId;
+
+    if (shopifyMetaobjectId || shopifyDiscountId) {
+      log.info('Deleting Shopify resources', { shopifyMetaobjectId, shopifyDiscountId });
+      const result = await this.shopifyIntegration.onBundleDelete(
+        bundleId,
+        shop,
+        shopifyMetaobjectId,
+        shopifyDiscountId
+      );
+
+      if (result.errors.length > 0) {
+        log.warn('Shopify resource deletion completed with errors', { errors: result.errors });
+        // Continue with local deletion even if Shopify cleanup fails
+      }
     }
 
     // Delete bundle (cascades to components, rules, etc.)
@@ -497,11 +568,19 @@ export class BundleService {
 
   /**
    * Publish a bundle (set to ACTIVE)
+   * Creates Shopify metaobject and discount on first publish
+   * Reactivates existing discount on republish
    */
   async publishBundle(bundleId: string, shop: string): Promise<BundleWithPricing> {
+    const log = createBundleLogger(bundleId, shop);
+
     const bundle = await prisma.bundle.findFirst({
       where: { id: bundleId, shop },
-      include: { components: true },
+      include: {
+        components: { orderBy: { displayOrder: 'asc' } },
+        pricingRules: { where: { isActive: true } },
+        discounts: { where: { isActive: true } },
+      },
     });
 
     if (!bundle) {
@@ -512,11 +591,81 @@ export class BundleService {
       throw new Error('Bundle must have at least 2 components to publish');
     }
 
+    // Get the discount percentage from pricing rules
+    const discountPercent = bundle.pricingRules[0]?.discountValue
+      ? Number(bundle.pricingRules[0].discountValue)
+      : 0;
+
+    // Prepare bundle data for Shopify integration
+    const bundleShopifyData: BundleShopifyData = {
+      id: bundle.id,
+      shop: bundle.shop,
+      name: bundle.name,
+      title: bundle.title,
+      description: bundle.description,
+      discountPercent,
+      components: bundle.components.map((c) => ({
+        shopifyProductId: c.shopifyProductId,
+        quantity: c.quantity,
+      })),
+    };
+
+    let shopifyMetaobjectId = bundle.shopifyMetaobjectId;
+    let shopifyDiscountId = bundle.discounts[0]?.shopifyDiscountId || null;
+
+    // Check if this is a first publish or republish
+    const isFirstPublish = !bundle.shopifyMetaobjectId && !shopifyDiscountId;
+
+    if (isFirstPublish) {
+      // First publish: Create Shopify resources
+      log.info('First publish - creating Shopify resources');
+      const result = await this.shopifyIntegration.onBundlePublish(bundleShopifyData);
+
+      shopifyMetaobjectId = result.metaobjectId;
+      shopifyDiscountId = result.discountId;
+
+      if (result.errors.length > 0) {
+        log.warn('Shopify integration completed with errors', { errors: result.errors });
+      }
+
+      // Store the discount ID in BundleDiscount table
+      if (shopifyDiscountId) {
+        await prisma.bundleDiscount.create({
+          data: {
+            bundleId,
+            shopifyDiscountId,
+            discountType: 'automatic',
+            isActive: true,
+          },
+        });
+      }
+    } else if (shopifyDiscountId) {
+      // Republish: Reactivate existing discount
+      log.info('Republish - reactivating discount');
+      const result = await this.shopifyIntegration.onBundleRepublish(
+        bundleId,
+        shop,
+        shopifyDiscountId
+      );
+
+      if (result.errors.length > 0) {
+        log.warn('Failed to reactivate discount', { errors: result.errors });
+      }
+
+      // Update discount record to active
+      await prisma.bundleDiscount.updateMany({
+        where: { bundleId, shopifyDiscountId },
+        data: { isActive: true },
+      });
+    }
+
+    // Update bundle status and Shopify references
     const updated = await prisma.bundle.update({
       where: { id: bundleId },
       data: {
         status: 'ACTIVE',
         publishedAt: new Date(),
+        shopifyMetaobjectId: shopifyMetaobjectId || bundle.shopifyMetaobjectId,
       },
       include: {
         components: { orderBy: { displayOrder: 'asc' } },
@@ -525,14 +674,51 @@ export class BundleService {
     });
 
     BundleMetrics.published({ shop, bundleId, bundleType: bundle.type });
+    log.info('Bundle published', { shopifyMetaobjectId, shopifyDiscountId });
 
     return this.enrichBundleWithPricing(updated);
   }
 
   /**
    * Unpublish a bundle (set to PAUSED)
+   * Deactivates the Shopify discount but keeps the metaobject for reference
    */
   async unpublishBundle(bundleId: string, shop: string): Promise<BundleWithPricing> {
+    const log = createBundleLogger(bundleId, shop);
+
+    // Get the bundle with its discount
+    const bundle = await prisma.bundle.findFirst({
+      where: { id: bundleId, shop },
+      include: {
+        discounts: { where: { isActive: true } },
+      },
+    });
+
+    if (!bundle) {
+      throw new Error('Bundle not found');
+    }
+
+    // Deactivate Shopify discount
+    const shopifyDiscountId = bundle.discounts[0]?.shopifyDiscountId || null;
+    if (shopifyDiscountId) {
+      log.info('Deactivating Shopify discount');
+      const result = await this.shopifyIntegration.onBundleUnpublish(
+        bundleId,
+        shop,
+        shopifyDiscountId
+      );
+
+      if (result.errors.length > 0) {
+        log.warn('Failed to deactivate discount', { errors: result.errors });
+      }
+
+      // Mark discount as inactive in database
+      await prisma.bundleDiscount.updateMany({
+        where: { bundleId, shopifyDiscountId },
+        data: { isActive: false },
+      });
+    }
+
     const updated = await prisma.bundle.update({
       where: { id: bundleId },
       data: { status: 'PAUSED' },
@@ -541,6 +727,8 @@ export class BundleService {
         pricingRules: { where: { isActive: true } },
       },
     });
+
+    log.info('Bundle unpublished');
 
     return this.enrichBundleWithPricing(updated);
   }
