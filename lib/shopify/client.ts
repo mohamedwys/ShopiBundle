@@ -68,18 +68,27 @@ export class RateLimitedShopifyClient {
       // Create GraphQL client
       const client = new shopify.clients.Graphql({ session: this.session! });
 
-      // Execute query
-      const response = await client.request(query, { variables });
+      // Execute query using the query method which returns { body }
+      const response = await client.query<GraphQLResponse<T>>({
+        data: {
+          query,
+          variables,
+        },
+      });
 
       // Update rate limiter from response headers if available
-      if (response.headers) {
-        this.rateLimiter.updateFromHeaders(response.headers as any);
+      // The response may have headers depending on the client version
+      const responseAny = response as any;
+      if (responseAny.headers) {
+        this.rateLimiter.updateFromHeaders(responseAny.headers);
       }
 
       success = true;
 
-      // Check for GraphQL errors
+      // Extract the result from body
       const result = response.body as GraphQLResponse<T>;
+
+      // Check for GraphQL errors
       if (result.errors && result.errors.length > 0) {
         logger.warn('GraphQL query returned errors', {
           shop: this.shop,
