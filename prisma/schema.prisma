@@ -140,3 +140,302 @@ model ai_fbt_config {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @default(now())
 }
+
+// ============================================
+// V2 BUNDLE SYSTEM (Sprint 1+)
+// ============================================
+
+// Core bundle entity
+model Bundle {
+  id                    String              @id @default(cuid())
+  shop                  String
+
+  // Basic Info
+  name                  String
+  title                 String
+  description           String?
+  slug                  String
+
+  // Bundle Type (Sprint 1: FIXED only)
+  type                  BundleType          @default(FIXED)
+  status                BundleStatus        @default(DRAFT)
+
+  // Shopify References
+  shopifyProductId      String?
+  shopifyMetaobjectId   String?
+
+  // Display Settings
+  displayOrder          Int                 @default(0)
+  featuredImage         String?
+  images                String[]
+
+  // Currency (prepared for multi-currency, Sprint 9+)
+  currencyCode          String              @default("USD")
+
+  // Metadata
+  tags                  String[]
+  metadata              Json?
+
+  // Timestamps
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  publishedAt           DateTime?
+
+  // Relations
+  components            BundleComponent[]
+  pricingRules          BundlePricingRule[]
+  discounts             BundleDiscount[]
+  inventoryRecord       BundleInventory?
+  analytics             BundleAnalytics[]
+  events                BundleEvent[]
+
+  @@unique([shop, slug])
+  @@index([shop, status])
+  @@index([shop, type])
+  @@index([createdAt])
+}
+
+enum BundleType {
+  FIXED              // All products included, no choices (Sprint 1)
+  MIX_MATCH          // Customer selects from options (Sprint 5)
+  TIERED             // Volume-based pricing tiers (Sprint 4)
+  BOGO               // Buy one get one (Sprint 3)
+  BUILD_YOUR_OWN     // Customer builds custom bundle (Sprint 6)
+  SUBSCRIPTION       // Recurring bundle (Sprint 7)
+  GIFT               // Gift bundle with message (Sprint 8)
+}
+
+enum BundleStatus {
+  DRAFT
+  ACTIVE
+  SCHEDULED
+  PAUSED
+  ARCHIVED
+}
+
+// Products included in a bundle
+model BundleComponent {
+  id                    String              @id @default(cuid())
+  bundleId              String
+  bundle                Bundle              @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  // Product Reference
+  shopifyProductId      String
+  shopifyVariantId      String?
+
+  // Component Settings
+  quantity              Int                 @default(1)
+  isRequired            Boolean             @default(true)
+  displayOrder          Int                 @default(0)
+
+  // For Mix & Match (Sprint 5+)
+  groupId               String?
+  minQuantity           Int                 @default(0)
+  maxQuantity           Int                 @default(1)
+
+  // Pricing Override
+  priceAdjustment       Decimal?            @db.Decimal(10, 2)
+  priceAdjustmentType   PriceAdjustmentType @default(NONE)
+
+  // Cached Product Data (for performance)
+  cachedTitle           String?
+  cachedPrice           Decimal?            @db.Decimal(10, 2)
+  cachedCompareAtPrice  Decimal?            @db.Decimal(10, 2)
+  cachedImageUrl        String?
+  cachedSku             String?
+  cachedInventory       Int?
+  lastSyncedAt          DateTime?
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([bundleId])
+  @@index([shopifyProductId])
+  @@index([groupId])
+}
+
+enum PriceAdjustmentType {
+  NONE
+  FIXED_AMOUNT
+  PERCENTAGE
+  FIXED_PRICE
+}
+
+// Pricing rules for bundles
+model BundlePricingRule {
+  id                    String              @id @default(cuid())
+  bundleId              String
+  bundle                Bundle              @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  name                  String
+  priority              Int                 @default(0)
+  isActive              Boolean             @default(true)
+
+  // Rule Type
+  ruleType              PricingRuleType     @default(BUNDLE_DISCOUNT)
+
+  // Conditions (JSON for flexibility)
+  conditions            Json                @default("{}")
+
+  // Discount Settings
+  discountType          DiscountType        @default(PERCENTAGE)
+  discountValue         Decimal             @db.Decimal(10, 2)
+
+  // Limits
+  usageLimit            Int?
+  usageCount            Int                 @default(0)
+  startsAt              DateTime?
+  endsAt                DateTime?
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([bundleId, isActive])
+  @@index([priority])
+}
+
+enum PricingRuleType {
+  BUNDLE_DISCOUNT       // Standard bundle discount (Sprint 1)
+  VOLUME_TIER           // Buy more, save more (Sprint 4)
+  BOGO                  // Buy X get Y (Sprint 3)
+  MEMBER_PRICE          // Customer tag based (Sprint 6)
+  TIME_LIMITED          // Flash sale (Sprint 6)
+  FIRST_PURCHASE        // New customer discount (Sprint 6)
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FIXED_PRICE
+  FREE_ITEM
+}
+
+// Shopify discount references
+model BundleDiscount {
+  id                    String              @id @default(cuid())
+  bundleId              String
+  bundle                Bundle              @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  shopifyDiscountId     String
+  discountCode          String?
+  discountType          String              @default("automatic")
+
+  isActive              Boolean             @default(true)
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@unique([bundleId, shopifyDiscountId])
+  @@index([shopifyDiscountId])
+}
+
+// Inventory tracking
+model BundleInventory {
+  id                    String              @id @default(cuid())
+  bundleId              String              @unique
+  bundle                Bundle              @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  // Inventory Method
+  trackingMethod        InventoryMethod     @default(COMPONENT_BASED)
+
+  // Bundle-specific inventory (if applicable)
+  bundleQuantity        Int?
+  lowStockThreshold     Int                 @default(10)
+
+  // Calculated from components
+  availableQuantity     Int                 @default(0)
+  reservedQuantity      Int                 @default(0)
+
+  // Settings
+  allowOversell         Boolean             @default(false)
+  autoSyncEnabled       Boolean             @default(true)
+
+  lastCalculatedAt      DateTime            @default(now())
+
+  @@index([bundleId])
+}
+
+enum InventoryMethod {
+  COMPONENT_BASED       // Min of all component inventories
+  BUNDLE_SPECIFIC       // Bundle has its own inventory
+  UNLIMITED             // No inventory tracking
+}
+
+// Daily analytics aggregation
+model BundleAnalytics {
+  id                    String              @id @default(cuid())
+  bundleId              String
+  bundle                Bundle              @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  date                  DateTime            @db.Date
+
+  // Engagement Metrics
+  impressions           Int                 @default(0)
+  clicks                Int                 @default(0)
+  addToCarts            Int                 @default(0)
+
+  // Conversion Metrics
+  orders                Int                 @default(0)
+  unitsSold             Int                 @default(0)
+
+  // Revenue Metrics
+  revenue               Decimal             @default(0) @db.Decimal(12, 2)
+  discountAmount        Decimal             @default(0) @db.Decimal(12, 2)
+  averageOrderValue     Decimal             @default(0) @db.Decimal(10, 2)
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@unique([bundleId, date])
+  @@index([date])
+}
+
+// Individual event tracking
+model BundleEvent {
+  id                    String              @id @default(cuid())
+  shop                  String
+  bundleId              String
+  bundle                Bundle              @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  eventType             String
+
+  // Context
+  sessionId             String?
+  customerId            String?
+  orderId               String?
+
+  // Event Data
+  quantity              Int                 @default(1)
+  revenue               Decimal?            @db.Decimal(10, 2)
+  metadata              Json?
+
+  // Source
+  source                String?
+  deviceType            String?
+
+  createdAt             DateTime            @default(now())
+
+  @@index([shop, bundleId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// Inventory sync log for debugging
+model InventorySyncLog {
+  id                    String              @id @default(cuid())
+  shop                  String
+  bundleId              String
+
+  syncType              String
+  previousQuantity      Int
+  newQuantity           Int
+  triggerProductId      String?
+
+  success               Boolean
+  errorMessage          String?
+
+  createdAt             DateTime            @default(now())
+
+  @@index([shop, bundleId])
+  @@index([createdAt])
+}
