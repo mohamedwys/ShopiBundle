@@ -1,8 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import withMiddleware from "@/utils/middleware/withMiddleware";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "@/utils/prisma";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {

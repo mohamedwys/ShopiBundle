@@ -1,13 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import withMiddleware from "@/utils/middleware/withMiddleware";
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/utils/prisma";
 import clientProvider from "@/utils/clientProvider";
 import { getOrders } from "@/utils/shopifyQueries/getOrders";
 import { AprioriAlgorithm, Transaction } from "@/utils/ai/apriori";
 import { createBundle } from "@/utils/shopifyQueries/createBundle";
 import { discountCreate } from "@/utils/shopifyQueries/discountCreate";
-
-const prisma = new PrismaClient();
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
