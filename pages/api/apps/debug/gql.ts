@@ -9,7 +9,7 @@ const handler = async (req, res) => {
       const { client } = await clientProvider.graphqlClient({
         req,
         res,
-        isOnline: true,
+        isOnline: false,
       });
       const shop = await client.query({ data: `{shop{name}}` });
       return res.status(200).send(shop);

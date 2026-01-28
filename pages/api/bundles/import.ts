@@ -12,7 +12,7 @@ const handler: NextApiHandler = async (req, res) => {
   const { client, shop } = await clientProvider.graphqlClient({
     req,
     res,
-    isOnline: true,
+    isOnline: false,
   });
 
   try {

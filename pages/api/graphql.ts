@@ -10,7 +10,7 @@ const handler = async (req, res) => {
 
   try {
     const sessionId = await shopify.session.getCurrentId({
-      isOnline: true,
+      isOnline: false,
       rawRequest: req,
       rawResponse: res,
     });

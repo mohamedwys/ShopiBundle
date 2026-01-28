@@ -12,7 +12,7 @@ const handler: NextApiHandler = async (req, res) => {
   const { client } = await clientProvider.graphqlClient({
     req,
     res,
-    isOnline: true,
+    isOnline: false,
   });
 
   const { ruleId, isActive } = JSON.parse(req.body);

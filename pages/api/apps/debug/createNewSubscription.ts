@@ -6,7 +6,7 @@ const handler = async (req, res) => {
   const { client, shop } = await clientProvider.graphqlClient({
     req,
     res,
-    isOnline: true,
+    isOnline: false,
   });
   const returnUrl = `${process.env.SHOPIFY_APP_URL}/api/auth?shop=${shop}`;
 
