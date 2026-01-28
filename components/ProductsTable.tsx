@@ -18,7 +18,7 @@ import { useRouter } from "next/router";
 import { useI18n } from "@shopify/react-i18n";
 import { useAppBridge } from "./providers/AppBridgeProvider";
 import { useBundleAPI } from "./hooks/useBundleAPI";
-import { Bundle, BundleStatus, ListBundlesParams } from "@/types/v2-api.types";
+import { Bundle, BundleStatus, ListBundlesParams, BundleInventory } from "@/types/v2-api.types";
 
 // Status badge color mapping
 const STATUS_BADGE_TONE: Record<BundleStatus, 'success' | 'info' | 'warning' | 'critical' | undefined> = {
@@ -28,6 +28,23 @@ const STATUS_BADGE_TONE: Record<BundleStatus, 'success' | 'info' | 'warning' | '
   PAUSED: 'warning',
   ARCHIVED: 'critical',
 };
+
+// Inventory badge component
+function InventoryBadge({ inventory }: { inventory?: BundleInventory }) {
+  if (!inventory) {
+    return <Badge>-</Badge>;
+  }
+
+  if (inventory.isOutOfStock) {
+    return <Badge tone="critical">Out of stock</Badge>;
+  }
+
+  if (inventory.isLowStock) {
+    return <Badge tone="warning">{`${inventory.available} left`}</Badge>;
+  }
+
+  return <Badge tone="success">{`${inventory.available} in stock`}</Badge>;
+}
 
 export default function ProductsTable() {
   const router = useRouter();
@@ -228,6 +245,9 @@ export default function ProductsTable() {
         {bundle.components.length} items
       </IndexTable.Cell>
       <IndexTable.Cell>
+        <InventoryBadge inventory={bundle.inventory} />
+      </IndexTable.Cell>
+      <IndexTable.Cell>
         {new Date(bundle.createdAt).toLocaleDateString()}
       </IndexTable.Cell>
       <IndexTable.Cell>
@@ -285,6 +305,7 @@ export default function ProductsTable() {
             { title: 'Discount' },
             { title: 'Price' },
             { title: 'Products' },
+            { title: 'Stock' },
             { title: 'Created' },
             { title: 'Actions' },
           ]}

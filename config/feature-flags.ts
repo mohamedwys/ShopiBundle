@@ -45,11 +45,11 @@ const DEFAULT_FLAGS: FeatureFlags = {
   V2_PRICING_ENGINE: true,
   V2_API_ROUTES: true,
 
-  // Sprint 3-4: Core Bundle Types
-  INVENTORY_SYNC: false,
+  // Sprint 3-4: Core Bundle Types - ENABLED for Sprint 3
+  INVENTORY_SYNC: true,
   BOGO_BUNDLES: false,
   TIERED_PRICING: false,
-  WEBHOOK_INVENTORY: false,
+  WEBHOOK_INVENTORY: true,
 
   // Sprint 5-6: Mix & Match
   MIX_MATCH_BUNDLES: false,

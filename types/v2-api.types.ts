@@ -22,6 +22,14 @@ export interface BundleComponent {
   cachedImageUrl: string | null;
 }
 
+// Inventory info for a bundle (Sprint 3)
+export interface BundleInventory {
+  available: number;
+  isLowStock: boolean;
+  isOutOfStock: boolean;
+  lastSynced: string | null;
+}
+
 // Full bundle with pricing
 export interface Bundle {
   id: string;
@@ -45,6 +53,8 @@ export interface Bundle {
   discountedPrice: number;
   savings: number;
   savingsPercentage: number;
+  // Inventory (Sprint 3)
+  inventory?: BundleInventory;
 }
 
 // Pagination info
