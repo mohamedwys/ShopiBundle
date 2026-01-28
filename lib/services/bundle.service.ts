@@ -10,6 +10,7 @@ import { logger, createBundleLogger } from '@/lib/monitoring/logger';
 import { BundleMetrics } from '@/lib/monitoring/metrics';
 import { isFeatureEnabled } from '@/config/feature-flags';
 import { PricingService } from './pricing.service';
+import { getInventoryService, InventoryService } from './inventory.service';
 import {
   getShopifyIntegrationService,
   ShopifyIntegrationService,
@@ -66,6 +67,13 @@ export interface BundleWithPricing {
   discountedPrice: number;
   savings: number;
   savingsPercentage: number;
+  // Inventory (Sprint 3)
+  inventory?: {
+    available: number;
+    isLowStock: boolean;
+    isOutOfStock: boolean;
+    lastSynced: Date | null;
+  };
 }
 
 export interface ComponentWithProduct {
@@ -104,10 +112,12 @@ export interface PaginatedBundles {
 export class BundleService {
   private pricingService: PricingService;
   private shopifyIntegration: ShopifyIntegrationService;
+  private inventoryService: InventoryService;
 
   constructor() {
     this.pricingService = new PricingService();
     this.shopifyIntegration = getShopifyIntegrationService();
+    this.inventoryService = getInventoryService();
   }
 
   /**
@@ -791,6 +801,26 @@ export class BundleService {
       bundle.pricingRules?.[0]?.discountValue || 0
     );
 
+    // Get inventory data if feature is enabled
+    let inventory: BundleWithPricing['inventory'] = undefined;
+    if (isFeatureEnabled('INVENTORY_SYNC')) {
+      try {
+        const inventoryResult = await this.inventoryService.calculateBundleInventory(bundle.id);
+        inventory = {
+          available: inventoryResult.availableQuantity,
+          isLowStock: inventoryResult.isLowStock,
+          isOutOfStock: inventoryResult.isOutOfStock,
+          lastSynced: inventoryResult.lastCalculatedAt,
+        };
+      } catch (error) {
+        // If inventory calculation fails, continue without it
+        logger.warn('Failed to calculate bundle inventory', {
+          bundleId: bundle.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
     return {
       id: bundle.id,
       shop: bundle.shop,
@@ -821,6 +851,7 @@ export class BundleService {
       discountedPrice: pricing.discountedPrice,
       savings: pricing.savings,
       savingsPercentage: pricing.savingsPercentage,
+      inventory,
     };
   }
 }

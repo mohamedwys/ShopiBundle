@@ -1,6 +1,7 @@
 import { ApiVersion, DeliveryMethod, shopifyApi, Session } from "@shopify/shopify-api";
 import "@shopify/shopify-api/adapters/node";
 import appUninstallHandler from "./webhooks/app_uninstalled";
+import inventoryLevelsUpdateHandler from "./webhooks/inventory_levels_update";
 import sessionHandler from "./sessionHandler";
 
 const isDev = process.env.NODE_ENV === "development";
@@ -68,6 +69,11 @@ shopify.webhooks.addHandlers({
     deliveryMethod: DeliveryMethod.Http,
     callbackUrl: "/api/webhooks/app_uninstalled",
     callback: appUninstallHandler,
+  },
+  INVENTORY_LEVELS_UPDATE: {
+    deliveryMethod: DeliveryMethod.Http,
+    callbackUrl: "/api/webhooks/inventory_levels_update",
+    callback: inventoryLevelsUpdateHandler,
   },
 });
 
