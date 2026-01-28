@@ -40,10 +40,10 @@ export interface FeatureFlags {
  * All new features start as disabled
  */
 const DEFAULT_FLAGS: FeatureFlags = {
-  // Sprint 1-2: Foundation
-  V2_BUNDLE_ENGINE: false,
-  V2_PRICING_ENGINE: false,
-  V2_API_ROUTES: false,
+  // Sprint 1-2: Foundation - ENABLED for V2 launch
+  V2_BUNDLE_ENGINE: true,
+  V2_PRICING_ENGINE: true,
+  V2_API_ROUTES: true,
 
   // Sprint 3-4: Core Bundle Types
   INVENTORY_SYNC: false,
