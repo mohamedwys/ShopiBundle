@@ -1,0 +1,317 @@
+{% comment %}
+  Enhanced Bundle Block - Phase 2
+
+  Features:
+  - Inventory status display
+  - Out-of-stock handling
+  - Quantity selector
+  - Component variant selection
+  - Enhanced add-to-cart UX
+{% endcomment %}
+
+{% assign type = 'product-bundles' %}
+{% assign bundle = shop.metaobjects[type][block.settings.shortcode] %}
+{% assign price = 0 %}
+{% assign compare_price = 0 %}
+{% assign out_of_stock = false %}
+{% assign low_stock = false %}
+{% assign min_inventory = 999999 %}
+
+{% if bundle %}
+  {% comment %} Calculate bundle pricing and check inventory {% endcomment %}
+  {% for product in bundle.products.value %}
+    {% assign price = price | plus: product.price %}
+    {% if product.compare_at_price > product.price %}
+      {% assign compare_price = compare_price | plus: product.compare_at_price %}
+    {% else %}
+      {% assign compare_price = compare_price | plus: product.price %}
+    {% endif %}
+
+    {% comment %} Check inventory for each product {% endcomment %}
+    {% if product.available == false %}
+      {% assign out_of_stock = true %}
+    {% elsif product.variants.first.inventory_quantity < min_inventory %}
+      {% assign min_inventory = product.variants.first.inventory_quantity %}
+    {% endif %}
+  {% endfor %}
+
+  {% if min_inventory <= 5 and min_inventory > 0 %}
+    {% assign low_stock = true %}
+  {% endif %}
+
+  {% comment %} Calculate discount {% endcomment %}
+  {% assign discount_percent = bundle.discount | times: 1.0 %}
+  {% assign discount_amount = price | times: discount_percent | divided_by: 100 %}
+  {% assign final_price = price | minus: discount_amount %}
+  {% assign savings = discount_amount %}
+
+  <div class="shopibundle-container"
+       data-bundle-id="{{ bundle.id }}"
+       data-bundle-slug="{{ bundle.bundle_name.value }}"
+       data-out-of-stock="{{ out_of_stock }}">
+
+    {% comment %} Bundle Header {% endcomment %}
+    <div class="shopibundle-header">
+      <h2 class="shopibundle-title">{{ bundle.bundle_title }}</h2>
+      {% if bundle.description != blank %}
+        <p class="shopibundle-description">{{ bundle.description }}</p>
+      {% endif %}
+
+      {% comment %} Savings Badge {% endcomment %}
+      <div class="shopibundle-badge">
+        <span class="shopibundle-badge-text">{{ 'save' | t }} {{ discount_percent }}%</span>
+      </div>
+    </div>
+
+    {% comment %} Products Grid {% endcomment %}
+    <div class="shopibundle-products">
+      {% for product in bundle.products.value %}
+        <div class="shopibundle-product" data-product-id="{{ product.id }}">
+          <div class="shopibundle-product-image-wrapper">
+            <a href="{{ product.url }}" class="shopibundle-product-link">
+              <img
+                class="shopibundle-product-image"
+                src="{{ product.featured_image | image_url: width: 300, height: 300 }}"
+                alt="{{ product.featured_image.alt | default: product.title }}"
+                loading="lazy"
+                width="300"
+                height="300"
+              >
+            </a>
+
+            {% comment %} Stock Status Badge {% endcomment %}
+            {% unless product.available %}
+              <span class="shopibundle-stock-badge shopibundle-stock-out">{{ 'out_of_stock' | t }}</span>
+            {% elsif product.variants.first.inventory_quantity <= 5 %}
+              <span class="shopibundle-stock-badge shopibundle-stock-low">
+                {{ 'low_stock' | t }}: {{ product.variants.first.inventory_quantity }} {{ 'left' | t }}
+              </span>
+            {% endunless %}
+          </div>
+
+          <div class="shopibundle-product-info">
+            <a href="{{ product.url }}" class="shopibundle-product-title">
+              {{ product.title }}
+            </a>
+            <div class="shopibundle-product-pricing">
+              <span class="shopibundle-product-price">{{ product.price | money }}</span>
+              {% if product.compare_at_price > product.price %}
+                <span class="shopibundle-product-compare-price">{{ product.compare_at_price | money }}</span>
+              {% endif %}
+            </div>
+
+            {% comment %} Variant selector if product has multiple variants {% endcomment %}
+            {% if product.variants.size > 1 %}
+              <select class="shopibundle-variant-select"
+                      data-product-id="{{ product.id }}"
+                      name="variant_{{ product.id }}">
+                {% for variant in product.variants %}
+                  <option value="{{ variant.id }}"
+                          data-price="{{ variant.price }}"
+                          {% unless variant.available %}disabled{% endunless %}>
+                    {{ variant.title }}{% unless variant.available %} - {{ 'sold_out' | t }}{% endunless %}
+                  </option>
+                {% endfor %}
+              </select>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% comment %} Bundle Summary & Add to Cart {% endcomment %}
+    <div class="shopibundle-summary">
+      {% comment %} Price Breakdown {% endcomment %}
+      <div class="shopibundle-price-breakdown">
+        <div class="shopibundle-price-row">
+          <span class="shopibundle-price-label">{{ 'original_price' | t }}:</span>
+          <span class="shopibundle-price-value shopibundle-original-price">
+            {{ price | money }}
+          </span>
+        </div>
+        <div class="shopibundle-price-row shopibundle-discount-row">
+          <span class="shopibundle-price-label">{{ 'bundle_discount' | t }} ({{ discount_percent }}%):</span>
+          <span class="shopibundle-price-value shopibundle-discount-amount">
+            -{{ savings | money }}
+          </span>
+        </div>
+        <div class="shopibundle-price-row shopibundle-total-row">
+          <span class="shopibundle-price-label">{{ 'bundle_price' | t }}:</span>
+          <span class="shopibundle-price-value shopibundle-final-price">
+            {{ final_price | money }}
+          </span>
+        </div>
+      </div>
+
+      {% comment %} Quantity Selector {% endcomment %}
+      <div class="shopibundle-quantity">
+        <label class="shopibundle-quantity-label" for="bundle-qty-{{ bundle.id }}">
+          {{ 'quantity' | t }}:
+        </label>
+        <div class="shopibundle-quantity-selector">
+          <button type="button" class="shopibundle-qty-btn shopibundle-qty-minus" aria-label="Decrease quantity">-</button>
+          <input type="number"
+                 id="bundle-qty-{{ bundle.id }}"
+                 class="shopibundle-qty-input"
+                 value="1"
+                 min="1"
+                 max="{{ min_inventory | default: 99 }}"
+                 {% if out_of_stock %}disabled{% endif %}>
+          <button type="button" class="shopibundle-qty-btn shopibundle-qty-plus" aria-label="Increase quantity">+</button>
+        </div>
+      </div>
+
+      {% comment %} Inventory Status {% endcomment %}
+      {% if out_of_stock %}
+        <div class="shopibundle-inventory-status shopibundle-out-of-stock">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>{{ 'bundle_out_of_stock' | t }}</span>
+        </div>
+      {% elsif low_stock %}
+        <div class="shopibundle-inventory-status shopibundle-low-stock">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span>{{ 'bundle_low_stock' | t }}: {{ min_inventory }} {{ 'bundles_left' | t }}</span>
+        </div>
+      {% else %}
+        <div class="shopibundle-inventory-status shopibundle-in-stock">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>{{ 'in_stock' | t }}</span>
+        </div>
+      {% endif %}
+
+      {% comment %} Add to Cart Form {% endcomment %}
+      <form class="shopibundle-form" data-bundle-form>
+        {% for product in bundle.products.value %}
+          <input type="hidden"
+                 name="items[{{ forloop.index0 }}][id]"
+                 value="{{ product.variants.first.id }}"
+                 data-variant-input="{{ product.id }}">
+          <input type="hidden"
+                 name="items[{{ forloop.index0 }}][quantity]"
+                 value="1"
+                 class="shopibundle-item-qty">
+          <input type="hidden"
+                 name="items[{{ forloop.index0 }}][properties][_bundle_id]"
+                 value="{{ bundle.bundle_name.value }}">
+          <input type="hidden"
+                 name="items[{{ forloop.index0 }}][properties][_bundle_title]"
+                 value="{{ bundle.bundle_title }}">
+          <input type="hidden"
+                 name="items[{{ forloop.index0 }}][properties][_bundle_discount]"
+                 value="{{ discount_percent }}%">
+          <input type="hidden"
+                 name="items[{{ forloop.index0 }}][properties][_bundle_item_index]"
+                 value="{{ forloop.index }}">
+          <input type="hidden"
+                 name="items[{{ forloop.index0 }}][properties][_bundle_total_items]"
+                 value="{{ bundle.products.value.size }}">
+        {% endfor %}
+
+        <button type="submit"
+                class="shopibundle-add-to-cart"
+                {% if out_of_stock %}disabled{% endif %}>
+          {% if out_of_stock %}
+            {{ 'sold_out' | t }}
+          {% else %}
+            <span class="shopibundle-btn-text">{{ 'add_bundle_to_cart' | t }}</span>
+            <span class="shopibundle-btn-price">{{ final_price | money }}</span>
+          {% endif %}
+        </button>
+      </form>
+
+      {% comment %} Trust Badges {% endcomment %}
+      {% if block.settings.show_trust_badges %}
+        <div class="shopibundle-trust-badges">
+          <div class="shopibundle-trust-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <span>{{ 'secure_checkout' | t }}</span>
+          </div>
+          <div class="shopibundle-trust-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            <span>{{ 'money_back_guarantee' | t }}</span>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+  {% if request.design_mode %}
+    <div class="shopibundle-placeholder">
+      <p>{{ 'configure_bundle' | t }}</p>
+    </div>
+  {% endif %}
+{% endif %}
+
+{% schema %}
+{
+  "name": "Enhanced Bundle",
+  "target": "section",
+  "stylesheet": "style.css",
+  "javascript": "bundle-enhanced.js",
+  "templates": ["index", "product", "collection", "cart", "page"],
+  "settings": [
+    {
+      "type": "text",
+      "id": "shortcode",
+      "label": "t:label",
+      "info": "t:info"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_trust_badges",
+      "label": "Show trust badges",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_inventory_count",
+      "label": "Show inventory count",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_quantity_selector",
+      "label": "Enable quantity selector",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "Layout",
+      "options": [
+        { "value": "horizontal", "label": "Horizontal" },
+        { "value": "vertical", "label": "Vertical" },
+        { "value": "grid", "label": "Grid" }
+      ],
+      "default": "horizontal"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent color",
+      "default": "#4CAF50"
+    },
+    {
+      "type": "color",
+      "id": "badge_color",
+      "label": "Savings badge color",
+      "default": "#FF5722"
+    }
+  ]
+}
+{% endschema %}
