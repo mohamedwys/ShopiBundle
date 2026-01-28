@@ -309,7 +309,7 @@ export default function ProductsTable() {
 
         {selectedResources.length > 0 && (
           <Button onClick={handleDelete} tone="critical" loading={deleting}>
-            Delete {selectedResources.length} selected
+            {`Delete ${selectedResources.length} selected`}
           </Button>
         )}
       </InlineStack>
