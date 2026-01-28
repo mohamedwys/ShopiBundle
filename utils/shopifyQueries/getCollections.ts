@@ -8,7 +8,9 @@ export type GetCollectionsQuery = {
           id: string;
           title: string;
           handle: string;
-          productsCount: number;
+          productsCount: {
+            count: number;
+          };
         };
       }>;
     };
@@ -25,12 +27,25 @@ export async function getCollections(client: GraphqlClient) {
               id
               title
               handle
-              productsCount
+              productsCount {
+                count
+              }
             }
           }
         }
       }`,
     },
   });
-  return body.data.collections;
+
+  // Transform to flatten productsCount for backward compatibility
+  return {
+    edges: body.data.collections.edges.map(edge => ({
+      node: {
+        id: edge.node.id,
+        title: edge.node.title,
+        handle: edge.node.handle,
+        productsCount: edge.node.productsCount.count,
+      }
+    }))
+  };
 }

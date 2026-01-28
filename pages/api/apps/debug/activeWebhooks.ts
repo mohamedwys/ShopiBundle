@@ -7,7 +7,7 @@ const handler = async (req, res) => {
       const { client } = await clientProvider.graphqlClient({
         req,
         res,
-        isOnline: true,
+        isOnline: false,
       });
       const activeWebhooks = await client.query({
         data: `{
