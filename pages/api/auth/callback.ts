@@ -164,10 +164,19 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     await sessionHandler.storeSession(session);
     console.log('✓ Session stored with ID:', session.id);
 
-    // Verify session was stored
+    // Brief delay to ensure database write is committed
+    // This helps with distributed database setups and connection pooling
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Verify session was stored (with retry logic built into loadSession)
     const storedSession = await sessionHandler.loadSession(session.id);
-    if (!storedSession || !storedSession.accessToken) {
-      throw new Error('Session storage verification failed');
+    if (!storedSession) {
+      console.error('Session verification failed - session not found after storage');
+      throw new Error('Session storage verification failed: session not found');
+    }
+    if (!storedSession.accessToken) {
+      console.error('Session verification failed - accessToken missing after storage');
+      throw new Error('Session storage verification failed: accessToken missing');
     }
 
     console.log('✓ Session verified in database');

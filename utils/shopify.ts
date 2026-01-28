@@ -15,15 +15,13 @@ interface SessionStorageInterface {
 }
 
 // Create custom session storage that uses our sessionHandler
+// IMPORTANT: Error handling must allow errors to propagate for proper OAuth flow
 const customSessionStorage: SessionStorageInterface = {
   async storeSession(session: Session): Promise<boolean> {
-    try {
-      await sessionHandler.storeSession(session);
-      return true;
-    } catch (error) {
-      console.error('Session storage failed:', error);
-      return false;
-    }
+    // Let errors propagate - don't swallow them
+    // The OAuth callback needs to know if session storage failed
+    await sessionHandler.storeSession(session);
+    return true;
   },
 
   async loadSession(id: string): Promise<Session | undefined> {
