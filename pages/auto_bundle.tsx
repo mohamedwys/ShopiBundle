@@ -19,6 +19,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import React from "react";
 import useFetch from "@/components/hooks/useFetch";
+import { useAppBridge } from "@/components/providers/AppBridgeProvider";
 import { useI18n } from "@shopify/react-i18n";
 
 export type getCollectionsData = {
@@ -43,6 +44,7 @@ export type getAutoBundleata = {
 const AutoBundlePage = () => {
   const router = useRouter();
   const fetch = useFetch();
+  const { isReady } = useAppBridge();
 
   const [i18n] = useI18n();
 
@@ -117,36 +119,56 @@ const AutoBundlePage = () => {
 
   async function getData() {
     setLoading(true);
-    let collections = await fetch("/api/getCollections", {
-      method: "POST",
-    }).then(async (res) => JSON.parse(await res.json()));
+    try {
+      // Fetch collections
+      const collectionsRes = await fetch("/api/getCollections", {
+        method: "POST",
+      });
+      if (!collectionsRes) {
+        console.error('Failed to fetch collections - App Bridge not ready');
+        setLoading(false);
+        return;
+      }
+      const collectionsData = await collectionsRes.json();
 
-    let tags = await fetch("/api/getProductTags", {
-      method: "POST",
-    }).then(async (res) => JSON.parse(await res.json()));
+      // Fetch tags
+      const tagsRes = await fetch("/api/getProductTags", {
+        method: "POST",
+      });
+      if (!tagsRes) {
+        console.error('Failed to fetch tags - App Bridge not ready');
+        setLoading(false);
+        return;
+      }
+      const tagsData = await tagsRes.json();
 
-    await fetch("/api/getAutoBundleData", {
-      method: "POST",
-    }).then(async (res) => {
-      if (res.status === 200) {
+      // Fetch auto bundle data
+      const autoBundleRes = await fetch("/api/getAutoBundleData", {
+        method: "POST",
+      });
+      if (autoBundleRes && autoBundleRes.status === 200) {
         setBundleActice(true);
-        const data: getAutoBundleata = JSON.parse(await res.json());
+        const data: getAutoBundleata = await autoBundleRes.json();
         setSelectedCollections(data.collections);
         setSelectedTags(data.tags);
         setDiscount(data.discount);
         setMinPrice(data.minPrice);
         setMaxPrice(data.maxPrice);
       }
-    });
 
-    setCollections(collections.edges);
-    setProductTags(tags.edges);
+      setCollections(collectionsData.edges || []);
+      setProductTags(tagsData.edges || []);
+    } catch (error) {
+      console.error('Error loading auto bundle data:', error);
+    }
     setLoading(false);
   }
 
   useEffect(() => {
-    getData();
-  }, []);
+    if (isReady) {
+      getData();
+    }
+  }, [isReady]);
 
   // delete auto bundle
   async function deleteAutoBundle() {

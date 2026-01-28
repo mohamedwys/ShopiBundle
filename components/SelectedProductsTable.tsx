@@ -1,7 +1,4 @@
-import {
-  Product,
-  ProductVariant,
-} from "@shopify/app-bridge/actions/ResourcePicker";
+import { Product, ProductVariant } from "@shopify/app-bridge/actions/ResourcePicker";
 import { IndexTable, Card, Text } from "@shopify/polaris";
 import React, { ReactElement } from "react";
 import { useI18n } from "@shopify/react-i18n";

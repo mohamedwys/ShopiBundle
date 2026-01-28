@@ -1,7 +1,9 @@
 import isShopAvailable from "@/utils/middleware/isShopAvailable";
 import { useRouter } from "next/router";
+import { ResourcePicker } from "@shopify/app-bridge/actions";
 import { Product } from "@shopify/app-bridge/actions/ResourcePicker";
 import SelectedProductsTable from "@/components/SelectedProductsTable";
+import { useAppBridge } from "@/components/providers/AppBridgeProvider";
 
 import {
   Banner,
@@ -27,6 +29,7 @@ import { CreateBundleInput } from "@/types/v2-api.types";
 const CreateBundlePage = () => {
   const router = useRouter();
   const [i18n] = useI18n();
+  const { app } = useAppBridge();
 
   // Use V2 Bundle API hook
   const { createBundle, loading, error, clearError } = useBundleAPI();
@@ -57,27 +60,38 @@ const CreateBundlePage = () => {
     []
   );
 
-  // Open Shopify product picker
-  const openProductPicker = async () => {
-    if (window.shopify) {
-      try {
-        const selection = await (window.shopify.resourcePicker({
-          type: 'product',
-          multiple: true,
-          action: 'select',
-          filter: {
-            variants: true,
-          },
-        }) as Promise<Product[]>);
+  // Open Shopify product picker using App Bridge v3
+  const openProductPicker = useCallback(() => {
+    if (!app) {
+      console.error('App Bridge not initialized');
+      setErrorMessage("App Bridge not ready. Please refresh the page.");
+      setErrorToastActive(true);
+      return;
+    }
 
+    try {
+      const picker = ResourcePicker.create(app, {
+        resourceType: ResourcePicker.ResourceType.Product,
+        options: {
+          selectMultiple: true,
+          showVariants: true,
+        },
+      });
+
+      picker.subscribe(ResourcePicker.Action.SELECT, (selectPayload) => {
+        const selection = selectPayload.selection as Product[];
         if (selection && selection.length > 0) {
           setSelectedProducts(selection);
         }
-      } catch (error) {
-        console.error('Product picker error:', error);
-      }
+      });
+
+      picker.dispatch(ResourcePicker.Action.OPEN);
+    } catch (err) {
+      console.error('Product picker error:', err);
+      setErrorMessage("Failed to open product picker");
+      setErrorToastActive(true);
     }
-  };
+  }, [app]);
 
   // Submit Form: Create new Bundle using V2 API
   async function handleSubmit() {
