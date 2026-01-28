@@ -5,7 +5,6 @@
  * Other bundle types will be added in subsequent sprints.
  */
 
-import { Prisma } from '@prisma/client';
 import prisma from '@/utils/prisma';
 import { logger, createBundleLogger } from '@/lib/monitoring/logger';
 import { BundleMetrics } from '@/lib/monitoring/metrics';
@@ -238,10 +237,10 @@ export class BundleService {
     const skip = (page - 1) * limit;
 
     // Build where clause
-    const where: Prisma.BundleWhereInput = { shop };
+    const where: Record<string, any> = { shop };
 
     if (status) {
-      where.status = status as any;
+      where.status = status;
     }
 
     if (search) {
@@ -314,7 +313,7 @@ export class BundleService {
     }
 
     // Build update data
-    const updateData: Prisma.BundleUpdateInput = {};
+    const updateData: Record<string, any> = {};
 
     if (input.name !== undefined) updateData.name = input.name;
     if (input.title !== undefined) updateData.title = input.title;

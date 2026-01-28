@@ -16,18 +16,20 @@ import {
   Toast,
   Frame,
   BlockStack,
+  InlineStack,
 } from "@shopify/polaris";
 import { useCallback, useState } from "react";
 import React from "react";
-import useFetch from "@/components/hooks/useFetch";
-import { BundleData } from "@/utils/shopifyQueries/createBundle";
+import { useBundleAPI } from "@/components/hooks/useBundleAPI";
 import { useI18n } from "@shopify/react-i18n";
+import { CreateBundleInput } from "@/types/v2-api.types";
 
 const CreateBundlePage = () => {
   const router = useRouter();
-  const fetch = useFetch();
-
   const [i18n] = useI18n();
+
+  // Use V2 Bundle API hook
+  const { createBundle, loading, error, clearError } = useBundleAPI();
 
   const [bundleName, setBundleName] = useState(
     `${i18n.translate("create_bundle.default_values.bundle_name")}`
@@ -40,12 +42,11 @@ const CreateBundlePage = () => {
   );
   const [discount, setDiscount] = useState("10");
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
-  const [resourcePicker, setResourcePicker] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   // success/error toast messages
   const [successToastActive, setSuccessToastActive] = useState(false);
   const [errorToastActive, setErrorToastActive] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const toggleSuccessToastActive = useCallback(
     () => setSuccessToastActive((active) => !active),
@@ -68,7 +69,7 @@ const CreateBundlePage = () => {
             variants: true,
           },
         }) as Promise<Product[]>);
-        
+
         if (selection && selection.length > 0) {
           setSelectedProducts(selection);
         }
@@ -78,24 +79,50 @@ const CreateBundlePage = () => {
     }
   };
 
-  // Submit Form: Create new Bundle
+  // Submit Form: Create new Bundle using V2 API
   async function handleSubmit() {
-    setLoading(true);
-    const data: BundleData = {
-      bundleName: bundleName,
-      bundleTitle: bundleTitle,
-      description: description,
-      discount: discount,
-      products: selectedProducts.map((products) => {
-        return products.id;
-      }),
+    // Validate inputs
+    if (!bundleName.trim()) {
+      setErrorMessage("Bundle name is required");
+      toggleErrorToastActive();
+      return;
+    }
+
+    if (!bundleTitle.trim()) {
+      setErrorMessage("Bundle title is required");
+      toggleErrorToastActive();
+      return;
+    }
+
+    if (selectedProducts.length < 2) {
+      setErrorMessage("Please select at least 2 products");
+      toggleErrorToastActive();
+      return;
+    }
+
+    const discountPercent = parseFloat(discount);
+    if (isNaN(discountPercent) || discountPercent < 0 || discountPercent > 100) {
+      setErrorMessage("Discount must be between 0 and 100");
+      toggleErrorToastActive();
+      return;
+    }
+
+    // Prepare V2 API input
+    const input: CreateBundleInput = {
+      name: bundleName.trim(),
+      title: bundleTitle.trim(),
+      description: description.trim() || undefined,
+      discountPercent,
+      components: selectedProducts.map((product) => ({
+        shopifyProductId: product.id,
+        quantity: 1,
+      })),
     };
 
-    let response = await fetch("/api/createBundle", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-    if (response.status === 200) {
+    const result = await createBundle(input);
+
+    if (result) {
+      // Success - reset form
       setBundleName(
         `${i18n.translate("create_bundle.default_values.bundle_name")}`
       );
@@ -106,12 +133,18 @@ const CreateBundlePage = () => {
         `${i18n.translate("create_bundle.default_values.description")}`
       );
       setDiscount("10");
+      setSelectedProducts([]);
       toggleSuccessToastActive();
+
+      // Redirect to home after a short delay
+      setTimeout(() => {
+        router.push("/");
+      }, 1500);
     } else {
+      // Error - show message
+      setErrorMessage(error || "Failed to create bundle");
       toggleErrorToastActive();
     }
-    setSelectedProducts([]);
-    setLoading(false);
   }
 
   const successToast = successToastActive ? (
@@ -121,11 +154,14 @@ const CreateBundlePage = () => {
       duration={3000}
     />
   ) : null;
-  
+
   const errorToast = errorToastActive ? (
     <Toast
-      content={i18n.translate("create_bundle.toasts.error")}
-      onDismiss={toggleErrorToastActive}
+      content={errorMessage || i18n.translate("create_bundle.toasts.error")}
+      onDismiss={() => {
+        toggleErrorToastActive();
+        clearError();
+      }}
       duration={3000}
       error
     />
@@ -182,6 +218,7 @@ const CreateBundlePage = () => {
                       )}
                       type="text"
                       autoComplete="off"
+                      multiline={3}
                     />
 
                     <TextField
@@ -219,6 +256,12 @@ const CreateBundlePage = () => {
                           {i18n.translate("create_bundle.products.warning")}
                         </Text>
                       </Banner>
+                    ) : selectedProducts.length === 1 ? (
+                      <Banner tone="warning">
+                        <Text as="p">
+                          Please select at least 2 products for a bundle.
+                        </Text>
+                      </Banner>
                     ) : (
                       <SelectedProductsTable products={selectedProducts} />
                     )}
@@ -229,19 +272,23 @@ const CreateBundlePage = () => {
                   </BlockStack>
                 </Card>
 
-                <div
-                  style={{ display: "flex", gap: "1rem", paddingBottom: "1rem" }}
-                >
+                <InlineStack gap="400" align="start">
                   <Button
                     size="large"
                     variant="primary"
                     submit
-                    disabled={selectedProducts.length === 0}
+                    disabled={selectedProducts.length < 2}
                     loading={loading}
                   >
                     {i18n.translate("buttons.save_bundle")}
                   </Button>
-                </div>
+                  <Button
+                    size="large"
+                    onClick={() => router.push("/")}
+                  >
+                    Cancel
+                  </Button>
+                </InlineStack>
               </FormLayout>
             </Form>
           </Layout.Section>
