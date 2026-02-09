@@ -1027,8 +1027,7 @@ function Step5Review({
               Products
             </Text>
             <Badge tone="info">
-              {selectedProducts.length} product
-              {selectedProducts.length !== 1 ? "s" : ""}
+              {`${selectedProducts.length} product${selectedProducts.length !== 1 ? "s" : ""}`}
             </Badge>
           </InlineStack>
           <Divider />
@@ -1080,7 +1079,7 @@ function Step5Review({
               Pricing Tiers
             </Text>
             <Badge tone="info">
-              {tiers.length} tier{tiers.length !== 1 ? "s" : ""}
+              {`${tiers.length} tier${tiers.length !== 1 ? "s" : ""}`}
             </Badge>
           </InlineStack>
           <Divider />

@@ -64,7 +64,7 @@ export function UsageBanner({
       <BlockStack gap="300">
         <ProgressBar
           progress={Math.min(usagePercent, 100)}
-          tone={isOverLimit ? 'success' : isNearLimit ? 'attention' : 'primary'}
+          tone={isOverLimit ? 'critical' : isNearLimit ? 'highlight' : 'primary'}
           size="small"
         />
 
