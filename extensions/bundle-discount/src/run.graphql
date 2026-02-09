@@ -1,0 +1,24 @@
+query RunInput {
+  cart {
+    lines {
+      id
+      quantity
+      merchandise {
+        ... on ProductVariant {
+          id
+          product {
+            id
+          }
+        }
+      }
+      attribute(key: "_bundle_id") {
+        value
+      }
+    }
+  }
+  discountNode {
+    metafield(namespace: "shopibundle", key: "bundle_config") {
+      value
+    }
+  }
+}

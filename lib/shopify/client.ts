@@ -290,21 +290,16 @@ export const QUERIES = {
 
 /**
  * Common GraphQL mutations
+ *
+ * Uses discountAutomaticAppCreate (Shopify Function) instead of DiscountAutomaticBasic.
+ * The Function (bundle-discount) enforces all bundle products + quantities in cart.
  */
 export const MUTATIONS = {
   CREATE_AUTOMATIC_DISCOUNT: `
-    mutation CreateAutomaticDiscount($discount: DiscountAutomaticBasicInput!) {
-      discountAutomaticBasicCreate(automaticBasicDiscount: $discount) {
-        automaticDiscountNode {
-          id
-          automaticDiscount {
-            ... on DiscountAutomaticBasic {
-              title
-              startsAt
-              endsAt
-              status
-            }
-          }
+    mutation CreateBundleFunctionDiscount($automaticAppDiscount: DiscountAutomaticAppInput!) {
+      discountAutomaticAppCreate(automaticAppDiscount: $automaticAppDiscount) {
+        automaticAppDiscount {
+          discountId
         }
         userErrors {
           field
@@ -326,11 +321,11 @@ export const MUTATIONS = {
     }
   `,
 
-  TOGGLE_AUTOMATIC_DISCOUNT: `
-    mutation ToggleAutomaticDiscount($id: ID!, $status: DiscountStatus!) {
-      discountAutomaticBasicUpdate(id: $id, automaticBasicDiscount: { status: $status }) {
-        automaticDiscountNode {
-          id
+  UPDATE_AUTOMATIC_DISCOUNT: `
+    mutation UpdateBundleFunctionDiscount($id: ID!, $automaticAppDiscount: DiscountAutomaticAppInput!) {
+      discountAutomaticAppUpdate(id: $id, automaticAppDiscount: $automaticAppDiscount) {
+        automaticAppDiscount {
+          discountId
         }
         userErrors {
           field

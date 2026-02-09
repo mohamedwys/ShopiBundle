@@ -382,6 +382,7 @@ export class BundleService {
         discountPercent,
         components: bundle.components.map((c) => ({
           shopifyProductId: c.shopifyProductId,
+          shopifyVariantId: c.shopifyVariantId || undefined,
           quantity: c.quantity,
         })),
       };
@@ -615,6 +616,7 @@ export class BundleService {
       discountPercent,
       components: bundle.components.map((c) => ({
         shopifyProductId: c.shopifyProductId,
+        shopifyVariantId: c.shopifyVariantId || undefined,
         quantity: c.quantity,
       })),
     };

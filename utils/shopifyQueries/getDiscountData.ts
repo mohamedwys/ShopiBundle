@@ -19,6 +19,12 @@ export async function getDiscountData(client: GraphqlClient, id: string) {
       query: `query ($id: ID!) {
         automaticDiscountNode(id: $id) {
           automaticDiscount {
+            ... on DiscountAutomaticApp {
+              title
+              shortSummary
+              asyncUsageCount
+              createdAt
+            }
             ... on DiscountAutomaticBasic {
               title
               shortSummary
@@ -26,7 +32,7 @@ export async function getDiscountData(client: GraphqlClient, id: string) {
               createdAt
             }
           }
-        }	
+        }
       }`,
       variables: {
         id: id,

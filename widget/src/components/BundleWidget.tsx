@@ -128,6 +128,7 @@ export function BundleWidget({
         properties: {
           ...item.properties,
           _bundle_id: config.id,
+          ...(selectedTier?.id ? { _bundle_tier: selectedTier.id } : {}),
         },
       };
     });

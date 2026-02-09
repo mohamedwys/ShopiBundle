@@ -1,7 +1,7 @@
 import { GraphqlClient } from "@shopify/shopify-api";
 
 /**
- * Toggles an automatic discount by setting its end date.
+ * Toggles a Function-based automatic discount by setting its end date.
  * To deactivate: sets endsAt to now
  * To activate: removes endsAt and sets startsAt to now
  */
@@ -12,8 +12,6 @@ export async function discountToggle(
 ) {
   const now = new Date().toISOString();
 
-  // If activating, remove end date and set start date to now
-  // If deactivating, set end date to now (effectively disabling it)
   const discountInput = isActive
     ? {
         startsAt: now,
@@ -25,17 +23,17 @@ export async function discountToggle(
 
   const { body } = await client.query<{
     data: {
-      discountAutomaticBasicUpdate: {
-        automaticDiscountNode: { id: string } | null;
+      discountAutomaticAppUpdate: {
+        automaticAppDiscount: { discountId: string } | null;
         userErrors: Array<{ field: string; code: string; message: string }>;
       };
     };
   }>({
     data: {
-      query: `mutation discountAutomaticBasicUpdate($id: ID!, $automaticBasicDiscount: DiscountAutomaticBasicInput!) {
-        discountAutomaticBasicUpdate(id: $id, automaticBasicDiscount: $automaticBasicDiscount) {
-          automaticDiscountNode {
-            id
+      query: `mutation discountAutomaticAppUpdate($id: ID!, $automaticAppDiscount: DiscountAutomaticAppInput!) {
+        discountAutomaticAppUpdate(id: $id, automaticAppDiscount: $automaticAppDiscount) {
+          automaticAppDiscount {
+            discountId
           }
           userErrors {
             field
@@ -46,18 +44,18 @@ export async function discountToggle(
       }`,
       variables: {
         id: id,
-        automaticBasicDiscount: discountInput,
+        automaticAppDiscount: discountInput,
       },
     },
   });
 
-  if (body.data?.discountAutomaticBasicUpdate.userErrors.length > 0) {
+  if (body.data?.discountAutomaticAppUpdate.userErrors.length > 0) {
     console.error(
       "Error toggling discount:",
-      body.data.discountAutomaticBasicUpdate.userErrors
+      body.data.discountAutomaticAppUpdate.userErrors
     );
     return false;
   }
 
-  return body.data?.discountAutomaticBasicUpdate.automaticDiscountNode !== null;
+  return body.data?.discountAutomaticAppUpdate.automaticAppDiscount !== null;
 }

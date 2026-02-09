@@ -3,6 +3,11 @@
  *
  * Handles creating, updating, and deleting Shopify resources (metaobjects and discounts)
  * when bundles are published, unpublished, or deleted.
+ *
+ * IMPORTANT: Uses discountAutomaticAppCreate (Shopify Function) instead of
+ * discountAutomaticBasicCreate. The Function enforces that ALL bundle products
+ * and quantities must be present in the cart before any discount applies.
+ * See extensions/bundle-discount/ for the Function implementation.
  */
 
 import { createShopifyClient, RateLimitedShopifyClient } from '@/lib/shopify/client';
@@ -16,9 +21,20 @@ export interface BundleShopifyData {
   title: string;
   description: string | null;
   discountPercent: number;
+  /** "percentage" or "fixed_amount" */
+  discountType?: 'percentage' | 'fixed_amount';
   components: Array<{
     shopifyProductId: string;
+    shopifyVariantId?: string;
     quantity: number;
+  }>;
+  /** Optional tiered bundle definitions for multi-tier discounts */
+  tiers?: Array<{
+    tierId: string;
+    discountPercent: number;
+    discountType?: 'percentage' | 'fixed_amount';
+    /** Multiplier: how many sets of the base components this tier requires */
+    bundleSets: number;
   }>;
 }
 
@@ -28,7 +44,38 @@ export interface ShopifyIntegrationResult {
   errors: string[];
 }
 
+// ============================================
+// BUNDLE CONFIG FORMAT (written to discount metafield)
+// ============================================
+
+/**
+ * This is the JSON structure stored in the discount's metafield.
+ * The Shopify Function reads this to validate bundle presence in cart.
+ */
+interface BundleDiscountConfig {
+  bundleId: string;
+  bundles: BundleDefinitionConfig[];
+}
+
+interface BundleDefinitionConfig {
+  tierId?: string;
+  minBundleSets: number;
+  maxBundleSets: number;
+  components: Array<{
+    productId: string;
+    variantId?: string;
+    quantity: number;
+  }>;
+  discount: {
+    type: 'percentage' | 'fixed_amount';
+    value: number;
+  };
+}
+
+// ============================================
 // GraphQL Response Types
+// ============================================
+
 interface MetaobjectCreateResponse {
   metaobjectCreate: {
     metaobject: {
@@ -68,14 +115,10 @@ interface MetaobjectDeleteResponse {
   };
 }
 
-interface DiscountCreateResponse {
-  discountAutomaticBasicCreate: {
-    automaticDiscountNode: {
-      id: string;
-      automaticDiscount: {
-        title: string;
-        status: string;
-      };
+interface DiscountAppCreateResponse {
+  discountAutomaticAppCreate: {
+    automaticAppDiscount: {
+      discountId: string;
     } | null;
     userErrors: Array<{
       field: string[];
@@ -85,10 +128,10 @@ interface DiscountCreateResponse {
   };
 }
 
-interface DiscountUpdateResponse {
-  discountAutomaticBasicUpdate: {
-    automaticDiscountNode: {
-      id: string;
+interface DiscountAppUpdateResponse {
+  discountAutomaticAppUpdate: {
+    automaticAppDiscount: {
+      discountId: string;
     } | null;
     userErrors: Array<{
       field: string[];
@@ -109,7 +152,10 @@ interface DiscountDeleteResponse {
   };
 }
 
+// ============================================
 // GraphQL Mutations
+// ============================================
+
 const METAOBJECT_CREATE_MUTATION = `
   mutation CreateBundleMetaobject($metaobject: MetaobjectCreateInput!) {
     metaobjectCreate(metaobject: $metaobject) {
@@ -155,17 +201,20 @@ const METAOBJECT_DELETE_MUTATION = `
   }
 `;
 
-const DISCOUNT_CREATE_MUTATION = `
-  mutation CreateBundleDiscount($automaticBasicDiscount: DiscountAutomaticBasicInput!) {
-    discountAutomaticBasicCreate(automaticBasicDiscount: $automaticBasicDiscount) {
-      automaticDiscountNode {
-        id
-        automaticDiscount {
-          ... on DiscountAutomaticBasic {
-            title
-            status
-          }
-        }
+/**
+ * Creates an automatic discount powered by a Shopify Function.
+ *
+ * The Function (handle: "bundle-discount") validates that ALL bundle products
+ * and required quantities are present in the cart before applying any discount.
+ *
+ * Bundle configuration is passed via the metafields array, which gets stored
+ * on the discount node and is read by the Function's input query.
+ */
+const DISCOUNT_APP_CREATE_MUTATION = `
+  mutation CreateBundleFunctionDiscount($automaticAppDiscount: DiscountAutomaticAppInput!) {
+    discountAutomaticAppCreate(automaticAppDiscount: $automaticAppDiscount) {
+      automaticAppDiscount {
+        discountId
       }
       userErrors {
         field
@@ -176,11 +225,11 @@ const DISCOUNT_CREATE_MUTATION = `
   }
 `;
 
-const DISCOUNT_UPDATE_MUTATION = `
-  mutation UpdateBundleDiscount($id: ID!, $automaticBasicDiscount: DiscountAutomaticBasicInput!) {
-    discountAutomaticBasicUpdate(id: $id, automaticBasicDiscount: $automaticBasicDiscount) {
-      automaticDiscountNode {
-        id
+const DISCOUNT_APP_UPDATE_MUTATION = `
+  mutation UpdateBundleFunctionDiscount($id: ID!, $automaticAppDiscount: DiscountAutomaticAppInput!) {
+    discountAutomaticAppUpdate(id: $id, automaticAppDiscount: $automaticAppDiscount) {
+      automaticAppDiscount {
+        discountId
       }
       userErrors {
         field
@@ -221,7 +270,7 @@ export class ShopifyIntegrationService {
 
   /**
    * Create Shopify resources when a bundle is published
-   * Creates both a metaobject and an automatic discount
+   * Creates both a metaobject and a Function-based automatic discount
    */
   async onBundlePublish(bundle: BundleShopifyData): Promise<ShopifyIntegrationResult> {
     const log = createBundleLogger(bundle.id, bundle.shop);
@@ -242,11 +291,11 @@ export class ShopifyIntegrationService {
       errors.push(errorMsg);
     }
 
-    // Create discount
+    // Create Function-based discount
     try {
-      log.info('Creating Shopify discount for bundle');
-      discountId = await this.createDiscount(client, bundle);
-      log.info('Discount created', { discountId });
+      log.info('Creating Shopify Function discount for bundle');
+      discountId = await this.createFunctionDiscount(client, bundle);
+      log.info('Function discount created', { discountId });
     } catch (error: any) {
       const errorMsg = `Failed to create discount: ${error.message}`;
       log.error(errorMsg, { error: error.message });
@@ -284,8 +333,8 @@ export class ShopifyIntegrationService {
     // Update discount if exists
     if (discountId) {
       try {
-        log.info('Updating Shopify discount for bundle');
-        await this.updateDiscount(client, discountId, bundle);
+        log.info('Updating Shopify Function discount for bundle');
+        await this.updateFunctionDiscount(client, discountId, bundle);
         log.info('Discount updated', { discountId });
       } catch (error: any) {
         const errorMsg = `Failed to update discount: ${error.message}`;
@@ -298,7 +347,8 @@ export class ShopifyIntegrationService {
   }
 
   /**
-   * Deactivate discount when a bundle is unpublished
+   * Deactivate discount when a bundle is unpublished.
+   * For Function discounts, we set endsAt to now via the App update mutation.
    */
   async onBundleUnpublish(
     bundleId: string,
@@ -311,8 +361,8 @@ export class ShopifyIntegrationService {
 
     if (discountId) {
       try {
-        log.info('Deactivating Shopify discount');
-        await this.toggleDiscount(client, discountId, false);
+        log.info('Deactivating Shopify Function discount');
+        await this.toggleFunctionDiscount(client, discountId, false);
         log.info('Discount deactivated', { discountId });
       } catch (error: any) {
         const errorMsg = `Failed to deactivate discount: ${error.message}`;
@@ -338,8 +388,8 @@ export class ShopifyIntegrationService {
 
     if (discountId) {
       try {
-        log.info('Reactivating Shopify discount');
-        await this.toggleDiscount(client, discountId, true);
+        log.info('Reactivating Shopify Function discount');
+        await this.toggleFunctionDiscount(client, discountId, true);
         log.info('Discount reactivated', { discountId });
       } catch (error: any) {
         const errorMsg = `Failed to reactivate discount: ${error.message}`;
@@ -393,17 +443,15 @@ export class ShopifyIntegrationService {
     return { success: errors.length === 0, errors };
   }
 
-  // Private methods for individual Shopify operations
+  // ============================================
+  // METAOBJECT OPERATIONS (unchanged)
+  // ============================================
 
-  /**
-   * Create a metaobject for a bundle
-   */
   private async createMetaobject(
     client: RateLimitedShopifyClient,
     bundle: BundleShopifyData
   ): Promise<string> {
     const productIds = bundle.components.map((c) => c.shopifyProductId);
-    const totalQuantity = bundle.components.reduce((sum, c) => sum + c.quantity, 0);
 
     const response = await client.mutate<MetaobjectCreateResponse>(METAOBJECT_CREATE_MUTATION, {
       metaobject: {
@@ -440,9 +488,6 @@ export class ShopifyIntegrationService {
     return result.metaobject.id;
   }
 
-  /**
-   * Update a metaobject for a bundle
-   */
   private async updateMetaobject(
     client: RateLimitedShopifyClient,
     metaobjectId: string,
@@ -469,9 +514,6 @@ export class ShopifyIntegrationService {
     }
   }
 
-  /**
-   * Delete a metaobject
-   */
   private async deleteMetaobject(
     client: RateLimitedShopifyClient,
     metaobjectId: string
@@ -486,131 +528,177 @@ export class ShopifyIntegrationService {
     }
   }
 
+  // ============================================
+  // FUNCTION DISCOUNT OPERATIONS (replaces DiscountAutomaticBasic)
+  // ============================================
+
   /**
-   * Create an automatic discount for a bundle
+   * Build the BundleDiscountConfig JSON that the Function reads from its metafield.
+   *
+   * For a simple (non-tiered) bundle:
+   *   - One BundleDefinition with all components and the discount
+   *
+   * For tiered bundles:
+   *   - Multiple BundleDefinitions, one per tier, sorted by best deal first
+   *   - Each tier specifies a different bundleSets count and discount
    */
-  private async createDiscount(
+  private buildBundleConfig(bundle: BundleShopifyData): BundleDiscountConfig {
+    const components = bundle.components.map((c) => ({
+      productId: c.shopifyProductId,
+      variantId: c.shopifyVariantId,
+      quantity: c.quantity,
+    }));
+
+    if (bundle.tiers && bundle.tiers.length > 0) {
+      // Tiered bundle: create a definition per tier
+      const bundles: BundleDefinitionConfig[] = bundle.tiers.map((tier) => ({
+        tierId: tier.tierId,
+        minBundleSets: tier.bundleSets,
+        maxBundleSets: tier.bundleSets,
+        components,
+        discount: {
+          type: tier.discountType || 'percentage',
+          value: tier.discountPercent,
+        },
+      }));
+
+      return { bundleId: bundle.id, bundles };
+    }
+
+    // Simple bundle: single definition
+    return {
+      bundleId: bundle.id,
+      bundles: [
+        {
+          minBundleSets: 1,
+          maxBundleSets: 0, // unlimited
+          components,
+          discount: {
+            type: bundle.discountType || 'percentage',
+            value: bundle.discountPercent,
+          },
+        },
+      ],
+    };
+  }
+
+  /**
+   * Create a Function-based automatic discount.
+   *
+   * Uses discountAutomaticAppCreate which links to our deployed Shopify Function.
+   * The bundle configuration is stored in the discount's metafield so the Function
+   * can read it at checkout time.
+   */
+  private async createFunctionDiscount(
     client: RateLimitedShopifyClient,
     bundle: BundleShopifyData
   ): Promise<string> {
-    const productIds = bundle.components.map((c) => c.shopifyProductId);
-    const totalMinQuantity = bundle.components.reduce((sum, c) => sum + c.quantity, 0);
+    const discountTitle = `Bundle: ${bundle.title} [${bundle.id.slice(-6)}]`;
+    const bundleConfig = this.buildBundleConfig(bundle);
 
-    // Create a unique discount title based on bundle
-    const discountTitle = `Bundle: ${bundle.title}`;
-
-    const response = await client.mutate<DiscountCreateResponse>(DISCOUNT_CREATE_MUTATION, {
-      automaticBasicDiscount: {
+    const response = await client.mutate<DiscountAppCreateResponse>(DISCOUNT_APP_CREATE_MUTATION, {
+      automaticAppDiscount: {
         title: discountTitle,
+        functionId: 'bundle-discount',
         startsAt: new Date().toISOString(),
         combinesWith: {
-          productDiscounts: true,
+          productDiscounts: false,
           orderDiscounts: false,
           shippingDiscounts: true,
         },
-        minimumRequirement: {
-          quantity: {
-            greaterThanOrEqualToQuantity: String(totalMinQuantity),
+        metafields: [
+          {
+            namespace: 'shopibundle',
+            key: 'bundle_config',
+            type: 'json',
+            value: JSON.stringify(bundleConfig),
           },
-        },
-        customerGets: {
-          items: {
-            products: {
-              productsToAdd: productIds,
-            },
-          },
-          value: {
-            percentage: bundle.discountPercent / 100,
-          },
-        },
+        ],
       },
     });
 
-    const result = response.data?.discountAutomaticBasicCreate;
+    const result = response.data?.discountAutomaticAppCreate;
     if (!result) {
-      throw new Error('No response from discount creation');
+      throw new Error('No response from Function discount creation');
     }
 
     if (result.userErrors.length > 0) {
       throw new Error(result.userErrors.map((e) => e.message).join(', '));
     }
 
-    if (!result.automaticDiscountNode) {
-      throw new Error('Discount creation returned no discount');
+    if (!result.automaticAppDiscount) {
+      throw new Error('Function discount creation returned no discount');
     }
 
-    return result.automaticDiscountNode.id;
+    return result.automaticAppDiscount.discountId;
   }
 
   /**
-   * Update an automatic discount for a bundle
+   * Update a Function-based automatic discount.
+   * Rewrites the bundle config metafield with the latest data.
    */
-  private async updateDiscount(
+  private async updateFunctionDiscount(
     client: RateLimitedShopifyClient,
     discountId: string,
     bundle: BundleShopifyData
   ): Promise<void> {
-    const productIds = bundle.components.map((c) => c.shopifyProductId);
-    const totalMinQuantity = bundle.components.reduce((sum, c) => sum + c.quantity, 0);
-    const discountTitle = `Bundle: ${bundle.title}`;
+    const discountTitle = `Bundle: ${bundle.title} [${bundle.id.slice(-6)}]`;
+    const bundleConfig = this.buildBundleConfig(bundle);
 
-    const response = await client.mutate<DiscountUpdateResponse>(DISCOUNT_UPDATE_MUTATION, {
+    const response = await client.mutate<DiscountAppUpdateResponse>(DISCOUNT_APP_UPDATE_MUTATION, {
       id: discountId,
-      automaticBasicDiscount: {
+      automaticAppDiscount: {
         title: discountTitle,
-        minimumRequirement: {
-          quantity: {
-            greaterThanOrEqualToQuantity: String(totalMinQuantity),
-          },
+        combinesWith: {
+          productDiscounts: false,
+          orderDiscounts: false,
+          shippingDiscounts: true,
         },
-        customerGets: {
-          items: {
-            products: {
-              productsToAdd: productIds,
-            },
+        metafields: [
+          {
+            namespace: 'shopibundle',
+            key: 'bundle_config',
+            type: 'json',
+            value: JSON.stringify(bundleConfig),
           },
-          value: {
-            percentage: bundle.discountPercent / 100,
-          },
-        },
+        ],
       },
     });
 
-    const result = response.data?.discountAutomaticBasicUpdate;
+    const result = response.data?.discountAutomaticAppUpdate;
     if (result?.userErrors && result.userErrors.length > 0) {
       throw new Error(result.userErrors.map((e) => e.message).join(', '));
     }
   }
 
   /**
-   * Toggle a discount's active state
+   * Toggle a Function discount's active state.
+   * For App discounts, use the same update mutation with startsAt/endsAt.
    */
-  private async toggleDiscount(
+  private async toggleFunctionDiscount(
     client: RateLimitedShopifyClient,
     discountId: string,
     activate: boolean
   ): Promise<void> {
     const now = new Date().toISOString();
 
-    // To deactivate: set endsAt to now
-    // To activate: remove endsAt and set startsAt to now
     const discountInput = activate
       ? { startsAt: now, endsAt: null }
       : { endsAt: now };
 
-    const response = await client.mutate<DiscountUpdateResponse>(DISCOUNT_UPDATE_MUTATION, {
+    const response = await client.mutate<DiscountAppUpdateResponse>(DISCOUNT_APP_UPDATE_MUTATION, {
       id: discountId,
-      automaticBasicDiscount: discountInput,
+      automaticAppDiscount: discountInput,
     });
 
-    const result = response.data?.discountAutomaticBasicUpdate;
+    const result = response.data?.discountAutomaticAppUpdate;
     if (result?.userErrors && result.userErrors.length > 0) {
       throw new Error(result.userErrors.map((e) => e.message).join(', '));
     }
   }
 
   /**
-   * Delete a discount
+   * Delete a discount (works for both App and Basic discount types)
    */
   private async deleteDiscount(
     client: RateLimitedShopifyClient,
