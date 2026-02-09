@@ -1,28 +1,40 @@
-import { NextApiHandler } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
+import withMiddleware from "@/utils/middleware/withMiddleware";
 import clientProvider from "@/utils/clientProvider";
 
 /**
  * Proxy route for the React bundle widget.
  * Returns a complete BundleConfig object that the widget can render directly.
  *
- * Query params:
+ * Called from storefront JavaScript via Shopify App Proxy.
+ * The verifyProxy middleware validates the Shopify signature and sets
+ * req.user_shop to the authenticated shop domain.
+ *
+ * Query params (provided by Shopify proxy + widget):
  *   - handle: Bundle slug/handle (for shortcode-based display)
  *   - product_id: Shopify product ID (for auto-injection)
- *   - shop: Shop domain
+ *   - shop: Shop domain (verified by middleware via HMAC signature)
+ *   - signature: Shopify HMAC signature (verified by middleware)
+ *   - timestamp: Request timestamp (verified by middleware)
  *   - locale: Customer locale (optional)
  *   - currency: Currency code (optional)
  */
-const handler: NextApiHandler = async (req, res) => {
+async function handler(
+  req: NextApiRequest & { user_shop?: string },
+  res: NextApiResponse
+) {
   if (req.method !== "GET") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
 
   try {
-    const { handle, product_id, shop } = req.query;
-    const shopDomain = shop || req.headers["x-shopify-shop-domain"];
+    const { handle, product_id } = req.query;
+    // Use the verified shop from middleware, NOT from the raw query string.
+    // This prevents cross-shop data access attacks.
+    const shopDomain = req.user_shop;
 
     if (!shopDomain) {
-      return res.status(400).json({ success: false, error: "Missing shop" });
+      return res.status(401).json({ success: false, error: "Shop not verified" });
     }
 
     if (!handle && !product_id) {
@@ -464,4 +476,4 @@ function buildFixedTiers(discount: number, products: any[]) {
   return tiers;
 }
 
-export default handler;
+export default withMiddleware("verifyProxy")(handler);

@@ -2,17 +2,26 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import withMiddleware from "@/utils/middleware/withMiddleware";
 import prisma from "@/utils/prisma";
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(
+  req: NextApiRequest & { user_shop?: string },
+  res: NextApiResponse
+) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const shop = req.query.shop as string;
+  // Use the verified shop from middleware, NOT from the raw query string.
+  // This prevents cross-shop data access attacks.
+  const shop = req.user_shop;
   const productId = req.query.productId as string;
   const sessionId = req.query.sessionId as string;
 
-  if (!shop || !productId) {
-    return res.status(400).json({ error: "Shop and productId are required" });
+  if (!shop) {
+    return res.status(401).json({ error: "Shop not verified" });
+  }
+
+  if (!productId) {
+    return res.status(400).json({ error: "productId is required" });
   }
 
   try {
