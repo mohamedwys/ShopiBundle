@@ -1,5 +1,5 @@
 import { Page, Layout, BlockStack } from "@shopify/polaris";
-import { useAppBridge } from "@shopify/app-bridge-react";
+import { useAppBridge } from "@/components/providers/AppBridgeProvider";
 import { useRouter } from "next/router";
 import AIFBTConfig from "@/components/AIFBTConfig";
 import AIBundlesTable from "@/components/AIBundlesTable";
@@ -7,7 +7,7 @@ import AIBundleAnalytics from "@/components/AIBundleAnalytics";
 import { useState, useCallback } from "react";
 
 export default function AIBundlesPage() {
-  const app = useAppBridge();
+  const { app } = useAppBridge();
   const router = useRouter();
   const shop = (router.query?.shop as string) || "";
   const [refreshKey, setRefreshKey] = useState(0);
