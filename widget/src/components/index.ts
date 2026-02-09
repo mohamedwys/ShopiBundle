@@ -5,3 +5,4 @@ export { SavingsBadge } from './SavingsBadge';
 export { ProgressBar } from './ProgressBar';
 export { VariantSelector } from './VariantSelector';
 export { SkeletonLoader } from './SkeletonLoader';
+export { ErrorBoundary } from './ErrorBoundary';

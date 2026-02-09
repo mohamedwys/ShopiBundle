@@ -21,6 +21,7 @@ import { createRoot } from 'react-dom/client';
 import type { BundleConfig, WidgetMountConfig } from './types';
 import { BundleWidget } from './components/BundleWidget';
 import { SkeletonLoader } from './components/SkeletonLoader';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // CSS is loaded as text by esbuild and injected into a <style> tag
 import cssText from './styles/bundle-widget.css';
@@ -173,7 +174,9 @@ function mountWidgets(): void {
     const root = createRoot(container);
     root.render(
       <React.StrictMode>
-        <WidgetRoot mountConfig={mountConfig} />
+        <ErrorBoundary>
+          <WidgetRoot mountConfig={mountConfig} />
+        </ErrorBoundary>
       </React.StrictMode>
     );
   });
