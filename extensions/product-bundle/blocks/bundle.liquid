@@ -1,76 +1,116 @@
+{% comment %}
+  ShopiBundle - Product Bundle Block
+  Supports two render modes:
+    1. React widget (default) - Rich interactive Rapi-style experience
+    2. Legacy Liquid (noscript fallback) - Server-rendered for no-JS environments
+{% endcomment %}
+
 {% assign type = 'product-bundles' %}
 {% assign bundle = shop.metaobjects[type][block.settings.shortcode] %}
-{% assign price = 0 %}
 
 {% if bundle %}
-  <div class="bundle" data-bundle-id="{{ bundle.id }}">
-    <p class="bundle-title">{{ bundle.bundle_title }}</p>
-    <p class="bundle-description">{{ bundle.description }}</p>
-    <p class="discounted-price">{{ bundle.discount }}% {{ 'discount' | t }}</p>
+  {% comment %} React Widget Mount Point {% endcomment %}
+  <div
+    id="shopibundle-widget-{{ block.id }}"
+    data-shopibundle-widget
+    data-bundle-handle="{{ block.settings.shortcode }}"
+    {% if product %}data-product-id="{{ product.id }}"{% endif %}
+    data-shop="{{ shop.permanent_domain }}"
+    data-money-format="{{ shop.money_format | json | escape }}"
+    data-locale="{{ request.locale.iso_code }}"
+    data-currency="{{ cart.currency.iso_code }}"
+    data-proxy-path="/apps/proxy"
+  >
+    {% comment %}
+      No-JS fallback: Render the legacy Liquid template.
+      React replaces this content once it mounts.
+    {% endcomment %}
+    <noscript>
+      {% assign price = 0 %}
+      <div class="bundle" data-bundle-id="{{ bundle.id }}">
+        <p class="bundle-title">{{ bundle.bundle_title }}</p>
+        <p class="bundle-description">{{ bundle.description }}</p>
+        <p class="discounted-price">{{ bundle.discount }}% {{ 'discount' | t }}</p>
 
-    <div class="products">
-      {% for product in bundle.products.value %}
-        <div class="product">
-          <a href="{{ product.url }}">
-            <img
-              class="product-image"
-              src="{{ product.featured_image | image_url: width: 200, height: 200 }}"
-              alt="{{ product.featured_image.alt }}"
-              loading="lazy"
-              height="200"
-              width="200"
-            >
-          </a>
-          <a class="product-name" href="{{ product.url }}">
-            <p>{{ product.title }}</p>
-          </a>
-          <p class="product-price">{{ product.price | money }}</p>
-          {% assign price = price | plus: product.price %}
+        <div class="products">
+          {% for product in bundle.products.value %}
+            <div class="product">
+              <a href="{{ product.url }}">
+                <img
+                  class="product-image"
+                  src="{{ product.featured_image | image_url: width: 200, height: 200 }}"
+                  alt="{{ product.featured_image.alt }}"
+                  loading="lazy"
+                  height="200"
+                  width="200"
+                >
+              </a>
+              <a class="product-name" href="{{ product.url }}">
+                <p>{{ product.title }}</p>
+              </a>
+              <p class="product-price">{{ product.price | money }}</p>
+              {% assign price = price | plus: product.price %}
+            </div>
+          {% endfor %}
         </div>
-      {% endfor %}
-    </div>
 
-    {% assign discountedPrice = price
-      | divided_by: 100
-      | times: bundle.discount
-    %}
-    {% assign savings = price | minus: discountedPrice | minus: price | abs %}
+        {% assign discountedPrice = price
+          | divided_by: 100
+          | times: bundle.discount
+        %}
+        {% assign savings = price | minus: discountedPrice | minus: price | abs %}
 
-    <div class="add-to-cart-button">
-      <p class="discounted-price">
-        <span class="original-price">{{ price | money }}</span>
-        {{ price | minus: discountedPrice | money }}
-        {{ 'only' | t }}
-      </p>
-      <p class="savings-badge">{{ 'save' | t }} {{ savings | money }}</p>
+        <div class="add-to-cart-button">
+          <p class="discounted-price">
+            <span class="original-price">{{ price | money }}</span>
+            {{ price | minus: discountedPrice | money }}
+            {{ 'only' | t }}
+          </p>
+          <p class="savings-badge">{{ 'save' | t }} {{ savings | money }}</p>
 
-      <form action="/cart/add" method="post" class="bundle-form">
-        {% for product in bundle.products.value %}
-          <input
-            type="hidden"
-            name="items[{{ forloop.index0 }}][id]"
-            value="{{ product.variants.first.id }}"
-          >
-          <input
-            type="hidden"
-            name="items[{{ forloop.index0 }}][quantity]"
-            value="1"
-          >
-          <input
-            type="hidden"
-            name="items[{{ forloop.index0 }}][properties][_bundle_id]"
-            value="{{ bundle.bundle_name.value }}"
-          >
-          <input
-            type="hidden"
-            name="items[{{ forloop.index0 }}][properties][_bundle_discount]"
-            value="{{ bundle.discount }}%"
-          >
-        {% endfor %}
-        <button type="submit" class="bundle-add-to-cart-btn">{{ 'action' | t }}</button>
-      </form>
-    </div>
+          <form action="/cart/add" method="post" class="bundle-form">
+            {% for product in bundle.products.value %}
+              <input
+                type="hidden"
+                name="items[{{ forloop.index0 }}][id]"
+                value="{{ product.variants.first.id }}"
+              >
+              <input
+                type="hidden"
+                name="items[{{ forloop.index0 }}][quantity]"
+                value="1"
+              >
+              <input
+                type="hidden"
+                name="items[{{ forloop.index0 }}][properties][_bundle_id]"
+                value="{{ bundle.bundle_name.value }}"
+              >
+              <input
+                type="hidden"
+                name="items[{{ forloop.index0 }}][properties][_bundle_discount]"
+                value="{{ bundle.discount }}%"
+              >
+            {% endfor %}
+            <button type="submit" class="bundle-add-to-cart-btn">{{ 'action' | t }}</button>
+          </form>
+        </div>
+      </div>
+    </noscript>
   </div>
+{% elsif block.settings.auto_inject %}
+  {% comment %} Auto-inject mode: Widget fetches bundles for current product {% endcomment %}
+  {% if product %}
+    <div
+      id="shopibundle-widget-auto-{{ block.id }}"
+      data-shopibundle-widget
+      data-product-id="{{ product.id }}"
+      data-shop="{{ shop.permanent_domain }}"
+      data-money-format="{{ shop.money_format | json | escape }}"
+      data-locale="{{ request.locale.iso_code }}"
+      data-currency="{{ cart.currency.iso_code }}"
+      data-proxy-path="/apps/proxy"
+    ></div>
+  {% endif %}
 {% endif %}
 
 {% schema %}
@@ -78,7 +118,7 @@
   "name": "Product Bundle",
   "target": "section",
   "stylesheet": "style.css",
-  "javascript": "bundle.js",
+  "javascript": "bundle-widget.js",
   "templates": ["index", "product", "collection", "cart"],
   "settings": [
     {
