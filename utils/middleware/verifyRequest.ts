@@ -1,13 +1,6 @@
 import sessionHandler from "@/utils/sessionHandler";
 import shopify from "@/utils/shopify";
 
-const TEST_QUERY = `
-{
-  shop {
-    name
-  }
-}`;
-
 const verifyRequest = async (req, res, next) => {
   try {
     // Step 1: Check for Bearer token in Authorization header
@@ -83,27 +76,12 @@ const verifyRequest = async (req, res, next) => {
 
     console.log(`✓ Offline session found for shop: ${shop}`);
 
-    // Step 5: Validate session with a test query
-    try {
-      const client = new shopify.clients.Graphql({ session });
-      await client.query({ data: TEST_QUERY });
-      console.log(`✓ Session validation successful (test query passed)`);
-    } catch (testError) {
-      console.error('✗ Session validation failed (test query):', testError.message);
-      console.error('This usually means the access token is invalid or expired.');
-
-      // If the token is invalid (401 from Shopify), delete the session to force reinstall
-      if (testError.message && testError.message.includes('401')) {
-        console.log(`🗑️  Deleting invalid session for shop: ${shop}`);
-        try {
-          await sessionHandler.deleteSession(offlineSessionId);
-          console.log(`✓ Invalid session deleted - user will need to reinstall`);
-        } catch (deleteError) {
-          console.error('Error deleting session:', deleteError);
-        }
-      }
-
-      // Return 403 with reauthorization headers
+    // Step 5: Validate that the session has a valid-looking access token
+    // We skip the test GraphQL query to avoid unnecessary latency, rate limits,
+    // and the destructive side-effect of deleting sessions on transient failures.
+    // The actual API call in the handler will surface auth errors if the token is invalid.
+    if (!session.accessToken.startsWith('shpat_') && !session.accessToken.startsWith('shpca_')) {
+      console.error(`✗ Session has invalid token format for shop: ${shop}`);
       res.status(403);
       res.setHeader("X-Shopify-API-Request-Failure-Reauthorize", "1");
       res.setHeader(
@@ -112,6 +90,8 @@ const verifyRequest = async (req, res, next) => {
       );
       return res.end();
     }
+
+    console.log(`✓ Session validation passed for shop: ${shop}`);
 
     // Step 6: Session is valid - set up request context
     req.user_session = session;
