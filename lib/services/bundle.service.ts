@@ -637,6 +637,11 @@ export class BundleService {
         log.warn('Shopify integration completed with errors', { errors: result.errors });
       }
 
+      // If both metaobject and discount failed, throw so the merchant knows
+      if (!result.metaobjectId && !result.discountId && result.errors.length > 0) {
+        throw new Error(`Failed to publish to Shopify: ${result.errors.join('; ')}`);
+      }
+
       // Store the discount ID in BundleDiscount table
       if (shopifyDiscountId) {
         await prisma.bundleDiscount.create({

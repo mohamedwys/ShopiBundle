@@ -30,8 +30,14 @@ async function handler(ctx: ApiContext): Promise<void> {
 
   if (req.method === 'POST') {
     // Publish bundle
-    const bundle = await bundleService.publishBundle(bundleId, shop);
-    return sendSuccess(res, { bundle });
+    try {
+      const bundle = await bundleService.publishBundle(bundleId, shop);
+      return sendSuccess(res, { bundle });
+    } catch (err: any) {
+      const message = err?.message || 'Failed to publish bundle';
+      console.error(`Publish failed for bundle ${bundleId}:`, message);
+      return sendError(res, message, 422);
+    }
   }
 
   if (req.method === 'DELETE') {

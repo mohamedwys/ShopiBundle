@@ -189,6 +189,30 @@ if (document.readyState === 'loading') {
   mountWidgets();
 }
 
+// Observe DOM for dynamically-added widget containers (AJAX section loading)
+if (typeof MutationObserver !== 'undefined') {
+  const observer = new MutationObserver((mutations) => {
+    let shouldMount = false;
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node instanceof HTMLElement) {
+          if (
+            node.hasAttribute('data-shopibundle-widget') ||
+            node.querySelector?.('[data-shopibundle-widget]')
+          ) {
+            shouldMount = true;
+          }
+        }
+      });
+    });
+    if (shouldMount) mountWidgets();
+  });
+  observer.observe(document.body || document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+}
+
 // Export for manual mounting
 (window as any).ShopiBundle = {
   mount: mountWidgets,
