@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState, createContext, useContext } from "react";
 import { useRouter } from "next/router";
 import createApp from "@shopify/app-bridge";
+import { NavigationMenu, AppLink } from "@shopify/app-bridge/actions";
 
 interface AppBridgeProviderProps {
   children: ReactNode;
@@ -73,6 +74,17 @@ export default function AppBridgeProvider({ children }: AppBridgeProviderProps) 
         host,
         forceRedirect: true,
       });
+
+      // Set up navigation menu in the Shopify admin sidebar
+      const navItems = [
+        { label: 'Bundle Builder', destination: '/bundle_builder' },
+        { label: 'AI Bundles', destination: '/ai_bundles' },
+        { label: 'Auto Bundles', destination: '/auto_bundles_v2' },
+        { label: 'Analytics', destination: '/analytics' },
+        { label: 'Settings', destination: '/settings' },
+      ].map((item) => AppLink.create(appBridge, item));
+
+      NavigationMenu.create(appBridge, { items: navItems });
 
       setApp(appBridge);
       setError(null);
