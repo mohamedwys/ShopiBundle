@@ -57,7 +57,20 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       .update(message)
       .digest('hex');
 
-    if (generatedHmac !== hmac) {
+    // Timing-safe comparison prevents attackers from using response time
+    // differences to guess the correct HMAC byte-by-byte.
+    let hmacValid: boolean;
+    try {
+      hmacValid = crypto.timingSafeEqual(
+        Buffer.from(generatedHmac, 'utf8'),
+        Buffer.from(hmac, 'utf8')
+      );
+    } catch {
+      // Buffer length mismatch means the HMACs are different lengths
+      hmacValid = false;
+    }
+
+    if (!hmacValid) {
       throw new Error('HMAC validation failed - request may be forged');
     }
 
