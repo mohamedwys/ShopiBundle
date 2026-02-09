@@ -1,5 +1,9 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import withMiddleware from "@/utils/middleware/withMiddleware";
+import {
+  withShopAuth,
+  ApiContext,
+  sendSuccess,
+  sendError,
+} from "@/lib/middleware/with-shop-auth";
 import prisma from "@/utils/prisma";
 import clientProvider from "@/utils/clientProvider";
 import { getOrders } from "@/utils/shopifyQueries/getOrders";
@@ -7,16 +11,8 @@ import { AprioriAlgorithm, Transaction } from "@/utils/ai/apriori";
 import { createBundle } from "@/utils/shopifyQueries/createBundle";
 import { discountCreate } from "@/utils/shopifyQueries/discountCreate";
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  const { shop } = req.body;
-
-  if (!shop) {
-    return res.status(400).json({ error: "Shop is required" });
-  }
+async function handler(ctx: ApiContext): Promise<void> {
+  const { shop, req, res } = ctx;
 
   try {
     const config = await prisma.ai_fbt_config.findUnique({
@@ -24,12 +20,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     if (!config || !config.isEnabled) {
-      return res.status(400).json({ error: "AI FBT is not enabled for this shop" });
+      return sendError(res, "AI FBT is not enabled for this shop", 400);
     }
 
     const { client } = await clientProvider.offline.graphqlClient({ shop });
     if (!client) {
-      return res.status(500).json({ error: "Failed to get Shopify client" });
+      return sendError(res, "Failed to get Shopify client - please reinstall the app", 500);
     }
 
     const startDate = new Date();
@@ -71,10 +67,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     if (transactions.length < 10) {
-      return res.status(400).json({
-        error: "Not enough order data for AI analysis",
-        transactionsFound: transactions.length,
-      });
+      return sendError(res, `Not enough order data for AI analysis (found ${transactions.length} transactions)`, 400);
     }
 
     const apriori = new AprioriAlgorithm(
@@ -171,19 +164,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       },
     });
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       bundlesCreated: createdBundles.length,
       transactionsAnalyzed: transactions.length,
       bundles: createdBundles,
     });
   } catch (error: any) {
     console.error("AI FBT generation error:", error);
-    return res.status(500).json({
-      error: "Failed to generate AI bundles",
-      message: error.message,
-    });
+    return sendError(res, "Failed to generate AI bundles", 500);
   }
 }
 
-export default withMiddleware("verifyRequest")(handler);
+export default withShopAuth(handler, {
+  methods: ["POST"],
+});

@@ -1,55 +1,47 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import withMiddleware from "@/utils/middleware/withMiddleware";
+import {
+  withShopAuth,
+  ApiContext,
+  sendSuccess,
+  sendError,
+} from "@/lib/middleware/with-shop-auth";
 import prisma from "@/utils/prisma";
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(ctx: ApiContext): Promise<void> {
+  const { shop, req, res } = ctx;
+
   if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return sendError(res, "Method not allowed", 405);
   }
 
-  const shop = req.query.shop as string;
   const productId = req.query.productId as string;
   const isActive = req.query.isActive === "true";
 
-  if (!shop) {
-    return res.status(400).json({ error: "Shop is required" });
+  const where: any = { shop };
+
+  if (productId) {
+    where.productId = productId;
   }
 
-  try {
-    const where: any = { shop };
-
-    if (productId) {
-      where.productId = productId;
-    }
-
-    if (isActive !== undefined) {
-      where.isActive = isActive;
-    }
-
-    const bundles = await prisma.ai_fbt_bundles.findMany({
-      where,
-      orderBy: [
-        { isActive: "desc" },
-        { confidenceScore: "desc" },
-        { generatedAt: "desc" },
-      ],
-    });
-
-    const config = await prisma.ai_fbt_config.findUnique({
-      where: { shop },
-    });
-
-    return res.status(200).json({
-      bundles,
-      config,
-    });
-  } catch (error: any) {
-    console.error("List AI bundles error:", error);
-    return res.status(500).json({
-      error: "Failed to list AI bundles",
-      message: error.message,
-    });
+  if (req.query.isActive !== undefined) {
+    where.isActive = isActive;
   }
+
+  const bundles = await prisma.ai_fbt_bundles.findMany({
+    where,
+    orderBy: [
+      { isActive: "desc" },
+      { confidenceScore: "desc" },
+      { generatedAt: "desc" },
+    ],
+  });
+
+  const config = await prisma.ai_fbt_config.findUnique({
+    where: { shop },
+  });
+
+  return sendSuccess(res, { bundles, config });
 }
 
-export default withMiddleware("verifyRequest")(handler);
+export default withShopAuth(handler, {
+  methods: ["GET"],
+});

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   IndexTable,
   Card,
@@ -32,24 +32,29 @@ interface AIBundlesTableProps {
 
 export default function AIBundlesTable({ shop, productId }: AIBundlesTableProps) {
   const fetch = useFetch();
+  const fetchRef = useRef(fetch);
+  fetchRef.current = fetch;
+
   const [bundles, setBundles] = useState<AIBundle[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadBundles = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ shop });
+      const params = new URLSearchParams();
       if (productId) params.append("productId", productId);
 
-      const response = await fetch(`/api/ai/fbt/list?${params.toString()}`);
+      const query = params.toString();
+      const response = await fetchRef.current(`/api/ai/fbt/list${query ? `?${query}` : ""}`);
+      if (!response) return;
       const data = await response.json();
-      setBundles(data.bundles || []);
+      setBundles(data.data?.bundles || []);
     } catch (error) {
       console.error("Failed to load AI bundles:", error);
     } finally {
       setLoading(false);
     }
-  }, [shop, productId, fetch]);
+  }, [productId]);
 
   useEffect(() => {
     loadBundles();
@@ -58,17 +63,18 @@ export default function AIBundlesTable({ shop, productId }: AIBundlesTableProps)
   const handleAction = useCallback(
     async (bundleId: string, action: string) => {
       try {
-        await fetch("/api/ai/fbt/override", {
+        const response = await fetchRef.current("/api/ai/fbt/override", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bundleId, action, shop }),
+          body: JSON.stringify({ bundleId, action }),
         });
+        if (!response) return;
         await loadBundles();
       } catch (error) {
         console.error("Failed to perform action:", error);
       }
     },
-    [shop, fetch, loadBundles]
+    [loadBundles]
   );
 
   const resourceName = {

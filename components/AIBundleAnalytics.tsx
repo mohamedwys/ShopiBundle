@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Card,
   IndexTable,
@@ -26,24 +26,29 @@ interface AIBundleAnalyticsProps {
 
 export default function AIBundleAnalytics({ shop, productId }: AIBundleAnalyticsProps) {
   const fetch = useFetch();
+  const fetchRef = useRef(fetch);
+  fetchRef.current = fetch;
+
   const [analytics, setAnalytics] = useState<VariantAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadAnalytics = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ shop });
+      const params = new URLSearchParams();
       if (productId) params.append("productId", productId);
 
-      const response = await fetch(`/api/ai/ab/analytics?${params.toString()}`);
+      const query = params.toString();
+      const response = await fetchRef.current(`/api/ai/ab/analytics${query ? `?${query}` : ""}`);
+      if (!response) return;
       const data = await response.json();
-      setAnalytics(data.analytics || []);
+      setAnalytics(data.data?.analytics || []);
     } catch (error) {
       console.error("Failed to load analytics:", error);
     } finally {
       setLoading(false);
     }
-  }, [shop, productId, fetch]);
+  }, [productId]);
 
   useEffect(() => {
     loadAnalytics();

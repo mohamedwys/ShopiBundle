@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Card,
   FormLayout,
@@ -19,6 +19,9 @@ interface AIFBTConfigProps {
 
 export default function AIFBTConfig({ shop, onGenerate }: AIFBTConfigProps) {
   const fetch = useFetch();
+  const fetchRef = useRef(fetch);
+  fetchRef.current = fetch;
+
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -35,17 +38,18 @@ export default function AIFBTConfig({ shop, onGenerate }: AIFBTConfigProps) {
   const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/ai/fbt/config?shop=${shop}`);
+      const response = await fetchRef.current("/api/ai/fbt/config");
+      if (!response) return;
       const data = await response.json();
-      if (data.config) {
-        setConfig(data.config);
+      if (data.success && data.data?.config) {
+        setConfig(data.data.config);
       }
     } catch (error) {
       console.error("Failed to load config:", error);
     } finally {
       setLoading(false);
     }
-  }, [shop, fetch]);
+  }, []);
 
   useEffect(() => {
     loadConfig();
@@ -55,34 +59,41 @@ export default function AIFBTConfig({ shop, onGenerate }: AIFBTConfigProps) {
     setLoading(true);
     setMessage(null);
     try {
-      await fetch("/api/ai/fbt/config", {
+      const response = await fetchRef.current("/api/ai/fbt/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shop, ...config }),
+        body: JSON.stringify(config),
       });
-      setMessage({ type: "success", text: "Configuration saved successfully" });
+      if (!response) return;
+      const data = await response.json();
+      if (data.success) {
+        setMessage({ type: "success", text: "Configuration saved successfully" });
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to save configuration" });
+      }
     } catch (error) {
       setMessage({ type: "error", text: "Failed to save configuration" });
     } finally {
       setLoading(false);
     }
-  }, [shop, config, fetch]);
+  }, [config]);
 
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/ai/fbt/generate", {
+      const response = await fetchRef.current("/api/ai/fbt/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shop }),
+        body: JSON.stringify({}),
       });
+      if (!response) return;
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success && data.data) {
         setMessage({
           type: "success",
-          text: `Generated ${data.bundlesCreated} bundles from ${data.transactionsAnalyzed} orders`,
+          text: `Generated ${data.data.bundlesCreated} bundles from ${data.data.transactionsAnalyzed} orders`,
         });
         if (onGenerate) onGenerate();
       } else {
@@ -93,7 +104,7 @@ export default function AIFBTConfig({ shop, onGenerate }: AIFBTConfigProps) {
     } finally {
       setGenerating(false);
     }
-  }, [shop, fetch, onGenerate]);
+  }, [onGenerate]);
 
   return (
     <Card>
