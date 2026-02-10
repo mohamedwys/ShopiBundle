@@ -47,8 +47,8 @@ const DEFAULT_FLAGS: FeatureFlags = {
 
   // Sprint 3-4: Core Bundle Types - ENABLED for Sprint 3
   INVENTORY_SYNC: true,
-  BOGO_BUNDLES: false,
-  TIERED_PRICING: false,
+  BOGO_BUNDLES: true,
+  TIERED_PRICING: true,
   WEBHOOK_INVENTORY: true,
 
   // Sprint 5-6: Mix & Match

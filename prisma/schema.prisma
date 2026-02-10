@@ -293,6 +293,11 @@ model Bundle {
   tags                  String[]
   metadata              Json?
 
+  // Type-specific settings (JSON for flexibility)
+  selectionRules         Json?    // MIX_MATCH/BUILD_YOUR_OWN: {minProducts, maxProducts, groups[]}
+  giftSettings           Json?    // GIFT: {allowGiftMessage, maxMessageLength, allowGiftWrap, wrapProductId, wrapPrice}
+  subscriptionSettings   Json?    // SUBSCRIPTION: {sellingPlanGroupId, frequencies[], subscriberDiscount, trialDays}
+
   // Timestamps
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt

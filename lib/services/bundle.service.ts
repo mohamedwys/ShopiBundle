@@ -24,15 +24,53 @@ export interface CreateBundleInput {
   title: string;
   description?: string;
   components: CreateComponentInput[];
-  discountPercent: number;
   tags?: string[];
   featuredImage?: string;
+
+  // Type — defaults to FIXED for backward compat
+  type?: 'FIXED' | 'TIERED' | 'BOGO' | 'MIX_MATCH' | 'BUILD_YOUR_OWN' | 'SUBSCRIPTION' | 'GIFT';
+
+  // Pricing — discountPercent kept for FIXED backward compat
+  discountPercent?: number;
+  pricingRules?: CreatePricingRuleInput[];
+
+  // Type-specific settings
+  selectionRules?: Record<string, unknown>;
+  giftSettings?: Record<string, unknown>;
+  subscriptionSettings?: Record<string, unknown>;
+
+  // Inventory overrides
+  inventoryConfig?: {
+    trackingMethod?: 'COMPONENT_BASED' | 'BUNDLE_SPECIFIC' | 'UNLIMITED';
+    lowStockThreshold?: number;
+    allowOversell?: boolean;
+  };
+
+  // Visual overrides (persisted to Bundle.metadata.visual)
+  visual?: Record<string, unknown>;
+}
+
+export interface CreatePricingRuleInput {
+  name: string;
+  ruleType: 'BUNDLE_DISCOUNT' | 'VOLUME_TIER' | 'BOGO' | 'MEMBER_PRICE' | 'TIME_LIMITED' | 'FIRST_PURCHASE';
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FIXED_PRICE' | 'FREE_ITEM';
+  discountValue: number;
+  conditions?: Record<string, unknown>;
+  startsAt?: string;
+  endsAt?: string;
+  priority?: number;
 }
 
 export interface CreateComponentInput {
   shopifyProductId: string;
   shopifyVariantId?: string;
   quantity?: number;
+  isRequired?: boolean;
+  minQuantity?: number;
+  maxQuantity?: number;
+  groupId?: string;
+  priceAdjustment?: number;
+  priceAdjustmentType?: 'NONE' | 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FIXED_PRICE';
 }
 
 export interface UpdateBundleInput {
@@ -150,40 +188,58 @@ export class BundleService {
         title: input.title,
         description: input.description,
         slug,
-        type: 'FIXED',
+        type: input.type || 'FIXED',
         status: 'DRAFT',
         featuredImage: input.featuredImage,
         tags: input.tags || [],
+        selectionRules: (input.selectionRules || undefined) as any,
+        giftSettings: (input.giftSettings || undefined) as any,
+        subscriptionSettings: (input.subscriptionSettings || undefined) as any,
+        metadata: (input.visual ? { visual: input.visual } : undefined) as any,
         components: {
           create: input.components.map((comp, index) => ({
             shopifyProductId: comp.shopifyProductId,
             shopifyVariantId: comp.shopifyVariantId,
             quantity: comp.quantity || 1,
-            isRequired: true,
+            isRequired: comp.isRequired !== undefined ? comp.isRequired : true,
             displayOrder: index,
-            minQuantity: 0,
-            maxQuantity: 1,
-            priceAdjustmentType: 'NONE',
+            minQuantity: comp.minQuantity ?? 0,
+            maxQuantity: comp.maxQuantity ?? 1,
+            priceAdjustmentType: comp.priceAdjustmentType || 'NONE',
+            groupId: comp.groupId || undefined,
+            priceAdjustment: comp.priceAdjustment ?? undefined,
           })),
         },
         pricingRules: {
-          create: {
-            name: 'Bundle Discount',
-            priority: 0,
-            isActive: true,
-            ruleType: 'BUNDLE_DISCOUNT',
-            conditions: {},
-            discountType: 'PERCENTAGE',
-            discountValue: input.discountPercent,
-          },
+          create: (input.pricingRules && input.pricingRules.length > 0
+            ? input.pricingRules.map((rule, idx) => ({
+                name: rule.name,
+                priority: rule.priority ?? idx,
+                isActive: true,
+                ruleType: rule.ruleType,
+                conditions: (rule.conditions || {}) as any,
+                discountType: rule.discountType,
+                discountValue: rule.discountValue,
+                startsAt: rule.startsAt ? new Date(rule.startsAt) : undefined,
+                endsAt: rule.endsAt ? new Date(rule.endsAt) : undefined,
+              }))
+            : [{
+                name: 'Bundle Discount',
+                priority: 0,
+                isActive: true,
+                ruleType: 'BUNDLE_DISCOUNT',
+                conditions: {} as any,
+                discountType: 'PERCENTAGE',
+                discountValue: input.discountPercent ?? 0,
+              }]) as any,
         },
         inventoryRecord: {
           create: {
-            trackingMethod: 'COMPONENT_BASED',
-            lowStockThreshold: 10,
+            trackingMethod: input.inventoryConfig?.trackingMethod || 'COMPONENT_BASED',
+            lowStockThreshold: input.inventoryConfig?.lowStockThreshold ?? 10,
             availableQuantity: 0,
             reservedQuantity: 0,
-            allowOversell: false,
+            allowOversell: input.inventoryConfig?.allowOversell ?? false,
             autoSyncEnabled: true,
           },
         },
@@ -199,7 +255,7 @@ export class BundleService {
     });
 
     // Track metric
-    BundleMetrics.created({ shop: input.shop, bundleType: 'FIXED' });
+    BundleMetrics.created({ shop: input.shop, bundleType: input.type || 'FIXED' });
 
     log.info('Bundle created', { bundleId: bundle.id });
 

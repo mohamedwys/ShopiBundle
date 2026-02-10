@@ -24,8 +24,34 @@ interface CreateBundleRequestBody {
     shopifyProductId: string;
     shopifyVariantId?: string;
     quantity?: number;
+    isRequired?: boolean;
+    minQuantity?: number;
+    maxQuantity?: number;
+    groupId?: string;
+    priceAdjustment?: number;
+    priceAdjustmentType?: string;
   }>;
-  discountPercent: number;
+  type?: string;
+  discountPercent?: number;
+  pricingRules?: Array<{
+    name: string;
+    ruleType: string;
+    discountType: string;
+    discountValue: number;
+    conditions?: Record<string, unknown>;
+    startsAt?: string;
+    endsAt?: string;
+    priority?: number;
+  }>;
+  selectionRules?: Record<string, unknown>;
+  giftSettings?: Record<string, unknown>;
+  subscriptionSettings?: Record<string, unknown>;
+  inventoryConfig?: {
+    trackingMethod?: string;
+    lowStockThreshold?: number;
+    allowOversell?: boolean;
+  };
+  visual?: Record<string, unknown>;
   tags?: string[];
   featuredImage?: string;
 }
@@ -82,8 +108,21 @@ async function handler(ctx: ApiContext): Promise<void> {
     if (!body.components || body.components.length < 2) {
       return sendError(res, 'At least 2 components are required');
     }
-    if (body.discountPercent === undefined || body.discountPercent < 0 || body.discountPercent > 100) {
-      return sendError(res, 'Discount percent must be between 0 and 100');
+
+    const bundleType = body.type || 'FIXED';
+
+    // For FIXED backward compat: require discountPercent
+    if (bundleType === 'FIXED') {
+      if (body.discountPercent === undefined || body.discountPercent < 0 || body.discountPercent > 100) {
+        return sendError(res, 'Discount percent must be between 0 and 100');
+      }
+    }
+
+    // For non-FIXED types: require pricingRules
+    if (bundleType !== 'FIXED' && (!body.pricingRules || body.pricingRules.length === 0)) {
+      if (body.discountPercent === undefined) {
+        return sendError(res, 'Either discountPercent or pricingRules is required');
+      }
     }
 
     const input: CreateBundleInput = {
@@ -91,12 +130,25 @@ async function handler(ctx: ApiContext): Promise<void> {
       name: body.name.trim(),
       title: body.title.trim(),
       description: body.description?.trim(),
-      components: body.components.map((c) => ({
+      type: bundleType as any,
+      components: body.components.map((c: any) => ({
         shopifyProductId: c.shopifyProductId,
         shopifyVariantId: c.shopifyVariantId,
         quantity: c.quantity || 1,
+        isRequired: c.isRequired,
+        minQuantity: c.minQuantity,
+        maxQuantity: c.maxQuantity,
+        groupId: c.groupId,
+        priceAdjustment: c.priceAdjustment,
+        priceAdjustmentType: c.priceAdjustmentType as any,
       })),
       discountPercent: body.discountPercent,
+      pricingRules: body.pricingRules as any,
+      selectionRules: body.selectionRules,
+      giftSettings: body.giftSettings,
+      subscriptionSettings: body.subscriptionSettings,
+      inventoryConfig: body.inventoryConfig as any,
+      visual: body.visual,
       tags: body.tags,
       featuredImage: body.featuredImage,
     };
