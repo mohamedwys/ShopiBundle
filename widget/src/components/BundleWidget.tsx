@@ -13,6 +13,10 @@ import { OfferCard } from './OfferCard';
 import { ProductCard } from './ProductCard';
 import { ProgressBar } from './ProgressBar';
 import { SkeletonLoader } from './SkeletonLoader';
+import { ProductSelector } from './ProductSelector';
+import { QuantitySelector } from './QuantitySelector';
+import { EmptyState } from './EmptyState';
+import { ErrorBanner } from './ErrorBanner';
 
 type AddToCartState = 'idle' | 'loading' | 'success' | 'error';
 
@@ -55,6 +59,14 @@ export function BundleWidget({
     }
     return initial;
   });
+
+  // Product selections for MIX_MATCH / BUILD_YOUR_OWN
+  const [selectedBuildProducts, setSelectedBuildProducts] = useState<Map<string, number>>(
+    () => new Map()
+  );
+
+  // Bundle quantity for quantity selector
+  const [bundleQuantity, setBundleQuantity] = useState<number>(1);
 
   const selectedTier = useMemo(
     () => tiers.find((t) => t.id === selectedTierId) || defaultTier,
@@ -102,6 +114,36 @@ export function BundleWidget({
   const handleVariantChange = useCallback(
     (productId: string, variantId: string) => {
       setVariantSelections((prev) => ({ ...prev, [productId]: variantId }));
+    },
+    []
+  );
+
+  const handleProductToggle = useCallback(
+    (productId: string, selected: boolean) => {
+      setSelectedBuildProducts((prev) => {
+        const next = new Map(prev);
+        if (selected) {
+          next.set(productId, 1);
+        } else {
+          next.delete(productId);
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleProductQuantityChange = useCallback(
+    (productId: string, quantity: number) => {
+      setSelectedBuildProducts((prev) => {
+        const next = new Map(prev);
+        if (quantity <= 0) {
+          next.delete(productId);
+        } else {
+          next.set(productId, quantity);
+        }
+        return next;
+      });
     },
     []
   );
@@ -177,14 +219,25 @@ export function BundleWidget({
     analytics,
   ]);
 
-  if (!tiers.length || !products.length) return <></>;
+  if (!tiers.length && !products.length) {
+    return <EmptyState title="No bundle available" description="This bundle is not currently active." />;
+  }
+  if (!products.length) {
+    return <EmptyState title="No products found" description="The products in this bundle are unavailable." icon="search" />;
+  }
 
   const showProducts =
     (config.type === 'fbt' ||
       config.type === 'mix-match' ||
+      config.type === 'build-your-own' ||
       config.type === 'fixed' ||
-      config.type === 'free-gift') &&
+      config.type === 'free-gift' ||
+      config.type === 'gift') &&
     visual.showProductImages;
+
+  const showProductSelector =
+    (config.type === 'mix-match' || config.type === 'build-your-own') &&
+    config.selectionRules;
 
   const buttonText = getButtonText(addToCartState, currentPricing, settings.currency);
 
@@ -218,6 +271,34 @@ export function BundleWidget({
               />
             </React.Fragment>
           ))}
+        </div>
+      )}
+
+      {/* Product selector for MIX_MATCH / BUILD_YOUR_OWN */}
+      {showProductSelector && config.selectionRules && (
+        <ProductSelector
+          products={config.selectionRules.productPool || products}
+          selectedProducts={selectedBuildProducts}
+          minSelect={config.selectionRules.minProducts}
+          maxSelect={config.selectionRules.maxProducts}
+          onToggle={handleProductToggle}
+          onQuantityChange={handleProductQuantityChange}
+          currency={settings.currency}
+          moneyFormat={settings.moneyFormat}
+          showPrice={true}
+        />
+      )}
+
+      {/* Quantity selector */}
+      {settings.showQuantitySelector && (
+        <div className="sb-widget__quantity">
+          <span className="sb-widget__quantity-label">Quantity:</span>
+          <QuantitySelector
+            value={bundleQuantity}
+            min={settings.minQuantity || 1}
+            max={settings.maxQuantity}
+            onChange={setBundleQuantity}
+          />
         </div>
       )}
 
@@ -289,9 +370,14 @@ export function BundleWidget({
         </button>
 
         {errorMessage && (
-          <p className="sb-widget__error" role="alert">
-            {errorMessage}
-          </p>
+          <ErrorBanner
+            message={errorMessage}
+            onDismiss={() => {
+              setErrorMessage('');
+              setAddToCartState('idle');
+            }}
+            retryAction={handleAddToCart}
+          />
         )}
       </div>
     </div>

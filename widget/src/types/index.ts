@@ -10,12 +10,15 @@
 // ============================================
 
 export type BundleType =
-  | 'volume'       // Volume discounts (buy 2, 3, 5+)
-  | 'bogo'         // Buy X Get Y free/discounted
-  | 'mix-match'    // Customer picks products
-  | 'fbt'          // Frequently bought together
-  | 'fixed'        // Fixed bundle (all products included)
-  | 'free-gift';   // Spend X get free gift
+  | 'volume'           // Volume discounts (buy 2, 3, 5+)
+  | 'bogo'             // Buy X Get Y free/discounted
+  | 'mix-match'        // Customer picks products
+  | 'build-your-own'   // Customer builds bundle from pool
+  | 'fbt'              // Frequently bought together
+  | 'fixed'            // Fixed bundle (all products included)
+  | 'free-gift'        // Spend X get free gift
+  | 'subscription'     // Recurring bundle
+  | 'gift';            // Gift bundle with message/wrapping
 
 export type DiscountType = 'percentage' | 'fixed' | 'free' | 'fixed_price';
 
@@ -30,6 +33,37 @@ export interface BundleConfig {
   visual: VisualConfig;
   analytics: AnalyticsConfig;
   settings: BundleSettings;
+
+  // MIX_MATCH / BUILD_YOUR_OWN selection rules
+  selectionRules?: {
+    minProducts: number;
+    maxProducts: number;
+    minQuantity?: number;
+    maxQuantity?: number;
+    productPool?: ProductReference[];
+    componentGroups?: Array<{
+      id: string;
+      name: string;
+      minSelect: number;
+      maxSelect: number;
+      productIds: string[];
+    }>;
+  };
+
+  // Gift bundle settings
+  giftSettings?: {
+    allowMessage: boolean;
+    maxMessageLength: number;
+    allowWrapping: boolean;
+    wrappingOptions?: Array<{ id: string; name: string; price: number; imageUrl?: string }>;
+  };
+
+  // Subscription settings
+  subscriptionSettings?: {
+    frequencies: Array<{ value: string; label: string; intervalCount: number; interval: 'DAY' | 'WEEK' | 'MONTH' | 'YEAR' }>;
+    defaultFrequency: string;
+    discountPercent: number;
+  };
 }
 
 export interface BundleTier {
@@ -109,6 +143,7 @@ export interface BundleSettings {
   addToCartBehavior: 'redirect' | 'drawer' | 'stay';
   showQuantitySelector: boolean;
   maxQuantity: number;
+  minQuantity: number;
   allowVariantSelection: boolean;
   outOfStockBehavior: 'disable' | 'hide' | 'notify';
 }
@@ -251,6 +286,39 @@ export interface ProgressBarProps {
   target: number;
   label: string;
   color?: string;
+}
+
+export interface ProductSelectorProps {
+  products: ProductReference[];
+  selectedProducts: Map<string, number>;
+  minSelect: number;
+  maxSelect: number;
+  onToggle: (productId: string, selected: boolean) => void;
+  onQuantityChange: (productId: string, quantity: number) => void;
+  currency: string;
+  moneyFormat: string;
+  showPrice: boolean;
+}
+
+export interface QuantitySelectorProps {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+  size?: 'small' | 'medium';
+}
+
+export interface EmptyStateProps {
+  title: string;
+  description?: string;
+  icon?: 'bundle' | 'search' | 'error';
+}
+
+export interface ErrorBannerProps {
+  message: string;
+  onDismiss?: () => void;
+  retryAction?: () => void;
 }
 
 // ============================================

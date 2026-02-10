@@ -22,6 +22,7 @@ import type { BundleConfig, WidgetMountConfig } from './types';
 import { BundleWidget } from './components/BundleWidget';
 import { SkeletonLoader } from './components/SkeletonLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { EmptyState } from './components/EmptyState';
 
 // CSS is loaded as text by esbuild and injected into a <style> tag
 import cssText from './styles/bundle-widget.css';
@@ -60,7 +61,8 @@ function WidgetRoot({ mountConfig }: { mountConfig: WidgetMountConfig }): React.
   }, [mountConfig]);
 
   if (loading) return <SkeletonLoader />;
-  if (error || !config) return <></>;
+  if (error) return <EmptyState title="Unable to load bundle" description={error} icon="error" />;
+  if (!config) return <></>;
 
   return <BundleWidget config={config} />;
 }

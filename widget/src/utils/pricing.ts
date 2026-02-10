@@ -28,9 +28,12 @@ export function calculateTierPricing(
       return calculateBogoPricing(tier, products);
     case 'fbt':
     case 'mix-match':
+    case 'build-your-own':
     case 'fixed':
+    case 'subscription':
       return calculateFixedPricing(tier, products);
     case 'free-gift':
+    case 'gift':
       return calculateFreeGiftPricing(tier, products);
     default:
       return calculateFixedPricing(tier, products);
