@@ -435,12 +435,17 @@ export class BundleService {
         name: bundle.name,
         title: bundle.title,
         description: bundle.description,
+        bundleType: bundle.type || 'FIXED',
         discountPercent,
         components: bundle.components.map((c) => ({
           shopifyProductId: c.shopifyProductId,
           shopifyVariantId: c.shopifyVariantId || undefined,
           quantity: c.quantity,
+          isRequired: c.isRequired,
         })),
+        selectionRules: bundle.selectionRules ? JSON.stringify(bundle.selectionRules) : undefined,
+        giftSettings: bundle.giftSettings ? JSON.stringify(bundle.giftSettings) : undefined,
+        subscriptionSettings: bundle.subscriptionSettings ? JSON.stringify(bundle.subscriptionSettings) : undefined,
       };
 
       const result = await this.shopifyIntegration.onBundleUpdate(
@@ -669,12 +674,17 @@ export class BundleService {
       name: bundle.name,
       title: bundle.title,
       description: bundle.description,
+      bundleType: bundle.type || 'FIXED',
       discountPercent,
       components: bundle.components.map((c) => ({
         shopifyProductId: c.shopifyProductId,
         shopifyVariantId: c.shopifyVariantId || undefined,
         quantity: c.quantity,
+        isRequired: c.isRequired,
       })),
+      selectionRules: bundle.selectionRules ? JSON.stringify(bundle.selectionRules) : undefined,
+      giftSettings: bundle.giftSettings ? JSON.stringify(bundle.giftSettings) : undefined,
+      subscriptionSettings: bundle.subscriptionSettings ? JSON.stringify(bundle.subscriptionSettings) : undefined,
     };
 
     let shopifyMetaobjectId = bundle.shopifyMetaobjectId;

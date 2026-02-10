@@ -20,6 +20,7 @@ export interface BundleShopifyData {
   name: string;
   title: string;
   description: string | null;
+  bundleType: string;
   discountPercent: number;
   /** "percentage" or "fixed_amount" */
   discountType?: 'percentage' | 'fixed_amount';
@@ -27,6 +28,7 @@ export interface BundleShopifyData {
     shopifyProductId: string;
     shopifyVariantId?: string;
     quantity: number;
+    isRequired?: boolean;
   }>;
   /** Optional tiered bundle definitions for multi-tier discounts */
   tiers?: Array<{
@@ -36,6 +38,12 @@ export interface BundleShopifyData {
     /** Multiplier: how many sets of the base components this tier requires */
     bundleSets: number;
   }>;
+  /** JSON-encoded selection rules for MIX_MATCH / BUILD_YOUR_OWN */
+  selectionRules?: string;
+  /** JSON-encoded gift settings for GIFT bundles */
+  giftSettings?: string;
+  /** JSON-encoded subscription settings for SUBSCRIPTION bundles */
+  subscriptionSettings?: string;
 }
 
 export interface ShopifyIntegrationResult {
@@ -464,10 +472,14 @@ export class ShopifyIntegrationService {
         fields: [
           { key: 'bundle_name', value: bundle.name },
           { key: 'bundle_title', value: bundle.title },
+          { key: 'bundle_type', value: bundle.bundleType || 'FIXED' },
           { key: 'description', value: bundle.description || '' },
           { key: 'created_at', value: new Date().toISOString() },
           { key: 'discount', value: String(Math.round(bundle.discountPercent)) },
           { key: 'products', value: JSON.stringify(productIds) },
+          ...(bundle.selectionRules ? [{ key: 'selection_rules', value: bundle.selectionRules }] : []),
+          ...(bundle.giftSettings ? [{ key: 'gift_settings', value: bundle.giftSettings }] : []),
+          ...(bundle.subscriptionSettings ? [{ key: 'subscription_settings', value: bundle.subscriptionSettings }] : []),
         ],
       },
     });
@@ -501,9 +513,13 @@ export class ShopifyIntegrationService {
         fields: [
           { key: 'bundle_name', value: bundle.name },
           { key: 'bundle_title', value: bundle.title },
+          { key: 'bundle_type', value: bundle.bundleType || 'FIXED' },
           { key: 'description', value: bundle.description || '' },
           { key: 'discount', value: String(Math.round(bundle.discountPercent)) },
           { key: 'products', value: JSON.stringify(productIds) },
+          ...(bundle.selectionRules ? [{ key: 'selection_rules', value: bundle.selectionRules }] : []),
+          ...(bundle.giftSettings ? [{ key: 'gift_settings', value: bundle.giftSettings }] : []),
+          ...(bundle.subscriptionSettings ? [{ key: 'subscription_settings', value: bundle.subscriptionSettings }] : []),
         ],
       },
     });

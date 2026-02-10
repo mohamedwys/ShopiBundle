@@ -106,10 +106,14 @@ async function handler(
         if (hasProduct) {
           bundles.push({
             id: bundle.handle,
+            type: fields.bundle_type || 'FIXED',
             title: fields.bundle_title || fields.bundle_name,
             discount: fields.discount,
             description: fields.description,
             products: products,
+            hasSelectionRules: !!fields.selection_rules,
+            hasGiftSettings: !!fields.gift_settings,
+            hasSubscriptionSettings: !!fields.subscription_settings,
           });
         }
       }
@@ -117,6 +121,7 @@ async function handler(
 
     // Cache for 5 minutes on CDN
     res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+    res.setHeader("Vary", "Accept-Encoding");
 
     return res.status(200).json(bundles);
   } catch (error) {

@@ -74,49 +74,75 @@ async function handler(
       }
     `;
 
-    const response: any = await client.request(query, {
-      variables: {
-        type: "product-bundles",
-        first: 50,
-      },
-    });
+    // Optimized query for handle-based lookups
+    const queryByHandle = `
+      query GetBundleByHandle($handle: String!, $type: String!) {
+        metaobjectByHandle(handle: { handle: $handle, type: $type }) {
+          id
+          handle
+          fields {
+            key
+            value
+          }
+        }
+      }
+    `;
 
     const normalizedProductId = product_id?.toString() || "";
     const normalizedHandle = handle?.toString() || "";
     let matchedBundle: any = null;
 
-    for (const edge of response.data.metaobjects.edges) {
-      const bundle = edge.node;
-      const fields: Record<string, string> = {};
+    if (normalizedHandle) {
+      // Direct lookup by handle — O(1) instead of fetching all
+      const handleResponse: any = await client.request(queryByHandle, {
+        variables: {
+          handle: normalizedHandle,
+          type: "product-bundles",
+        },
+      });
 
-      for (const field of bundle.fields) {
-        fields[field.key] = field.value;
-      }
-
-      // Match by handle
-      if (normalizedHandle && bundle.handle === normalizedHandle) {
+      const bundle = handleResponse.data?.metaobjectByHandle;
+      if (bundle) {
+        const fields: Record<string, string> = {};
+        for (const field of bundle.fields) {
+          fields[field.key] = field.value;
+        }
         matchedBundle = { ...fields, _handle: bundle.handle, _id: bundle.id };
-        break;
       }
+    } else if (normalizedProductId) {
+      // Fallback: fetch all and filter by product_id
+      const response: any = await client.request(query, {
+        variables: {
+          type: "product-bundles",
+          first: 50,
+        },
+      });
 
-      // Match by product_id
-      if (normalizedProductId && fields.products) {
-        let products: string[] = [];
-        try {
-          products = JSON.parse(fields.products);
-        } catch {
-          products = [fields.products];
+      for (const edge of response.data.metaobjects.edges) {
+        const bundle = edge.node;
+        const fields: Record<string, string> = {};
+        for (const field of bundle.fields) {
+          fields[field.key] = field.value;
         }
 
-        const hasProduct = products.some(
-          (pid: string) =>
-            pid.includes(normalizedProductId) ||
-            normalizedProductId.includes(pid)
-        );
+        if (fields.products) {
+          let products: string[] = [];
+          try {
+            products = JSON.parse(fields.products);
+          } catch {
+            products = [fields.products];
+          }
 
-        if (hasProduct) {
-          matchedBundle = { ...fields, _handle: bundle.handle, _id: bundle.id };
-          break;
+          const hasProduct = products.some(
+            (pid: string) =>
+              pid.includes(normalizedProductId) ||
+              normalizedProductId.includes(pid)
+          );
+
+          if (hasProduct) {
+            matchedBundle = { ...fields, _handle: bundle.handle, _id: bundle.id };
+            break;
+          }
         }
       }
     }
