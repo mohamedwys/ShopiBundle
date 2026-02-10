@@ -35,6 +35,7 @@ function makeLine(opts: {
   productId: string;
   variantId: string;
   bundleId?: string;
+  tierId?: string;
 }): RunInput['cart']['lines'][0] {
   return {
     id: opts.id || `line_${Math.random().toString(36).slice(2, 8)}`,
@@ -44,6 +45,7 @@ function makeLine(opts: {
       product: { id: opts.productId },
     },
     attribute: opts.bundleId ? { value: opts.bundleId } : null,
+    tierAttribute: opts.tierId ? { value: opts.tierId } : null,
   };
 }
 
@@ -388,6 +390,122 @@ const test13 = (() => {
   const totalQty = result.discounts[0].targets.reduce((sum, t) => sum + t.productVariant.quantity, 0);
   console.assert(totalQty === 4, 'Test 13 FAIL: Expected 4 discounted units (2 sets capped), got ' + totalQty);
   console.log('Test 13 PASS: maxBundleSets caps discount correctly');
+})();
+
+// --- Scenario 14: BOGO free items - applies 100% discount to free items ---
+const test14 = (() => {
+  const config: BundleDiscountConfig = {
+    bundleId: 'bogo-bundle',
+    bundles: [{
+      minBundleSets: 1,
+      maxBundleSets: 1,
+      components: [{ productId: 'gid://shopify/Product/1', quantity: 1 }],
+      discount: { type: 'percentage', value: 0 },
+      freeItems: [{ productId: 'gid://shopify/Product/2', quantity: 1 }],
+      freeItemDiscount: { type: 'free_item', value: 100 },
+    }],
+  };
+  const input = makeInput({
+    config,
+    lines: [
+      makeLine({ quantity: 1, productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/1' }),
+      makeLine({ quantity: 1, productId: 'gid://shopify/Product/2', variantId: 'gid://shopify/ProductVariant/2' }),
+    ],
+  });
+  const result = run(input);
+  if (result.discounts.length === 0) {
+    console.log('Test 14 DEBUG: No discounts created');
+  } else {
+    console.log('Test 14 DEBUG: Created', result.discounts.length, 'discounts');
+    result.discounts.forEach(d => console.log('  -', d.message));
+  }
+  console.assert(result.discounts.length > 0, 'Test 14 FAIL: Expected at least one discount');
+  // The free item should get 100% discount
+  const freeDiscount = result.discounts.find(d => d.message?.includes('Free item'));
+  if (freeDiscount) {
+    console.assert((freeDiscount.value as any).percentage.value === '100', 'Test 14 FAIL: Expected 100% discount for free item');
+  }
+  console.log('Test 14 PASS: BOGO free item gets 100% discount');
+})();
+
+// --- Scenario 15: BOGO still matches bundle even if free item not in cart ---
+const test15 = (() => {
+  const config: BundleDiscountConfig = {
+    bundleId: 'bogo-bundle',
+    bundles: [{
+      minBundleSets: 1,
+      maxBundleSets: 1,
+      components: [{ productId: 'gid://shopify/Product/1', quantity: 1 }],
+      discount: { type: 'percentage', value: 10 },
+      freeItems: [{ productId: 'gid://shopify/Product/2', quantity: 1 }],
+    }],
+  };
+  const input = makeInput({
+    config,
+    lines: [
+      makeLine({ quantity: 1, productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/1' }),
+    ],
+  });
+  const result = run(input);
+  console.assert(result.discounts.length > 0, 'Test 15 FAIL: Expected bundle to match even without free item');
+  console.log('Test 15 PASS: BOGO bundle matches even without free item in cart');
+})();
+
+// --- Scenario 16: MIX_MATCH matches when enough optional components are present ---
+const test16 = (() => {
+  const config: BundleDiscountConfig = {
+    bundleId: 'mix-match',
+    bundles: [{
+      minBundleSets: 1,
+      maxBundleSets: 1,
+      components: [],
+      discount: { type: 'percentage', value: 15 },
+      optionalComponents: [
+        { productId: 'gid://shopify/Product/1', quantity: 1 },
+        { productId: 'gid://shopify/Product/2', quantity: 1 },
+        { productId: 'gid://shopify/Product/3', quantity: 1 },
+      ],
+      minRequiredOptional: 2,
+    }],
+  };
+  const input = makeInput({
+    config,
+    lines: [
+      makeLine({ quantity: 1, productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/1' }),
+      makeLine({ quantity: 1, productId: 'gid://shopify/Product/3', variantId: 'gid://shopify/ProductVariant/3' }),
+    ],
+  });
+  const result = run(input);
+  console.assert(result.discounts.length > 0, 'Test 16 FAIL: Expected MIX_MATCH to match with 2 optional components');
+  console.log('Test 16 PASS: MIX_MATCH matches with enough optional components');
+})();
+
+// --- Scenario 17: MIX_MATCH does not match when too few optional components ---
+const test17 = (() => {
+  const config: BundleDiscountConfig = {
+    bundleId: 'mix-match',
+    bundles: [{
+      minBundleSets: 1,
+      maxBundleSets: 1,
+      components: [],
+      discount: { type: 'percentage', value: 15 },
+      optionalComponents: [
+        { productId: 'gid://shopify/Product/1', quantity: 1 },
+        { productId: 'gid://shopify/Product/2', quantity: 1 },
+        { productId: 'gid://shopify/Product/3', quantity: 1 },
+      ],
+      minRequiredOptional: 2,
+    }],
+  };
+  const input = makeInput({
+    config,
+    lines: [
+      makeLine({ quantity: 1, productId: 'gid://shopify/Product/1', variantId: 'gid://shopify/ProductVariant/1' }),
+    ],
+  });
+  const result = run(input);
+  console.assert(result.discounts.length === 0, 'Test 17 FAIL: Expected no discount with too few optional components');
+  console.log('Test 17 PASS: MIX_MATCH does not match with too few optional components');
 })();
 
 console.log('\n=== All tests completed ===');

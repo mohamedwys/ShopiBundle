@@ -23,6 +23,7 @@ export interface CartLine {
   quantity: number;
   merchandise: ProductVariant;
   attribute: CartAttribute | null;
+  tierAttribute: CartAttribute | null;
 }
 
 export interface ProductVariant {
@@ -55,6 +56,9 @@ export interface BundleDiscountConfig {
   /** Unique bundle identifier from the app's database */
   bundleId: string;
 
+  /** Bundle type */
+  bundleType?: "FIXED" | "TIERED" | "BOGO" | "MIX_MATCH" | "BUILD_YOUR_OWN" | "SUBSCRIPTION" | "GIFT";
+
   /** Array of bundle definitions (supports multiple bundles per discount for tiered) */
   bundles: BundleDefinition[];
 }
@@ -74,6 +78,14 @@ export interface BundleDefinition {
 
   /** Discount to apply when bundle is complete */
   discount: BundleDiscountValue;
+
+  /** BOGO: items that become free/discounted when bundle is matched */
+  freeItems?: BundleComponent[];
+  freeItemDiscount?: BundleDiscountValue;
+
+  /** MIX_MATCH / BUILD_YOUR_OWN: optional product pool */
+  optionalComponents?: BundleComponent[];
+  minRequiredOptional?: number;
 }
 
 export interface BundleComponent {
@@ -88,10 +100,10 @@ export interface BundleComponent {
 }
 
 export interface BundleDiscountValue {
-  /** "percentage" or "fixed_amount" */
-  type: "percentage" | "fixed_amount";
+  /** "percentage", "fixed_amount", or "free_item" */
+  type: "percentage" | "fixed_amount" | "free_item";
 
-  /** For percentage: 0-100. For fixed_amount: amount in shop currency. */
+  /** For percentage: 0-100. For fixed_amount: amount in shop currency. For free_item: usually 100. */
   value: number;
 }
 
@@ -149,6 +161,7 @@ export interface BundleMatchResult {
   matched: boolean;
   bundleSets: number;
   matchedLines: MatchedLine[];
+  freeItemLines?: MatchedLine[];
   definition: BundleDefinition;
 }
 

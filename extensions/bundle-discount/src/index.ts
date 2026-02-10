@@ -73,9 +73,9 @@ export function run(input: RunInput): FunctionRunResult {
     }
 
     // Build discount for this bundle match
-    const discount = buildDiscount(bundleDef, result);
-    if (discount) {
-      allDiscounts.push(discount);
+    const discounts = buildDiscount(bundleDef, result);
+    for (let i = 0; i < discounts.length; i++) {
+      allDiscounts.push(discounts[i]);
     }
   }
 
@@ -199,6 +199,11 @@ function matchBundle(
     maxSets = Math.min(maxSets, setsFromComponent);
   }
 
+  // If no required components (MIX_MATCH / BUILD_YOUR_OWN), set maxSets to 1
+  if (definition.components.length === 0 && definition.optionalComponents) {
+    maxSets = 1;
+  }
+
   if (maxSets === Infinity || maxSets === 0) {
     return noMatch;
   }
@@ -239,10 +244,74 @@ function matchBundle(
     }
   }
 
+  // Match free items (BOGO)
+  let freeItemLines: MatchedLine[] = [];
+  if (definition.freeItems && definition.freeItems.length > 0) {
+    for (const freeComp of definition.freeItems) {
+      let needed = freeComp.quantity * bundleSets;
+
+      for (const line of cartLines) {
+        if (needed <= 0) break;
+        const available = remainingQuantity.get(line.id) || 0;
+        if (available <= 0) continue;
+        if (line.merchandise.product.id !== freeComp.productId) continue;
+        if (freeComp.variantId && line.merchandise.id !== freeComp.variantId) continue;
+
+        const take = Math.min(needed, available);
+        if (take > 0) {
+          freeItemLines.push({
+            lineId: line.id,
+            variantId: line.merchandise.id,
+            quantityUsed: take,
+          });
+          // Deduct from remaining so free items aren't double-counted
+          remainingQuantity.set(line.id, available - take);
+          needed -= take;
+        }
+      }
+
+      // If free items not fully available, still match the bundle
+      // (customer just doesn't get the full free items)
+    }
+  }
+
+  // Match optional components (MIX_MATCH / BUILD_YOUR_OWN)
+  if (definition.optionalComponents && definition.minRequiredOptional) {
+    let optionalMatched = 0;
+    for (const optComp of definition.optionalComponents) {
+      for (const line of cartLines) {
+        const available = remainingQuantity.get(line.id) || 0;
+        if (available <= 0) continue;
+        if (line.merchandise.product.id !== optComp.productId) continue;
+        if (optComp.variantId && line.merchandise.id !== optComp.variantId) continue;
+
+        const lineBundleAttr = line.attribute?.value;
+        if (lineBundleAttr && lineBundleAttr !== bundleId) continue;
+
+        if (available >= optComp.quantity) {
+          optionalMatched++;
+          const take = optComp.quantity;
+          matchedLines.push({
+            lineId: line.id,
+            variantId: line.merchandise.id,
+            quantityUsed: take,
+          });
+          remainingQuantity.set(line.id, available - take);
+          break;
+        }
+      }
+    }
+
+    if (optionalMatched < definition.minRequiredOptional) {
+      return noMatch;
+    }
+  }
+
   return {
     matched: true,
     bundleSets,
     matchedLines,
+    freeItemLines,
     definition,
   };
 }
@@ -258,35 +327,58 @@ function matchBundle(
 function buildDiscount(
   definition: BundleDefinition,
   matchResult: BundleMatchResult
-): Discount | null {
-  if (!matchResult.matched || matchResult.matchedLines.length === 0) {
-    return null;
+): Discount[] {
+  if (!matchResult.matched) {
+    return [];
   }
 
-  // Build targets: one entry per matched line
-  const targets: ProductVariantTarget[] = matchResult.matchedLines.map((ml) => ({
+  // Allow buildDiscount to proceed even if matchedLines is empty (e.g., BOGO with free items only)
+  if (matchResult.matchedLines.length === 0 && (!matchResult.freeItemLines || matchResult.freeItemLines.length === 0)) {
+    return [];
+  }
+
+  const discounts: Discount[] = [];
+
+  // Primary discount: applies to all matched lines
+  const primaryTargets: ProductVariantTarget[] = matchResult.matchedLines.map((ml) => ({
     productVariant: {
       id: ml.variantId,
       quantity: ml.quantityUsed,
     },
   }));
 
-  // Build discount value
-  const value = buildDiscountValue(definition);
-  if (!value) {
-    return null;
+  const primaryValue = buildDiscountValue(definition);
+  if (primaryValue) {
+    const tierLabel = definition.tierId ? ` (${definition.tierId})` : "";
+    const setsLabel = matchResult.bundleSets > 1 ? ` x${matchResult.bundleSets}` : "";
+    discounts.push({
+      message: `Bundle discount${tierLabel}${setsLabel}`,
+      targets: primaryTargets,
+      value: primaryValue,
+    });
   }
 
-  // Build message
-  const tierLabel = definition.tierId ? ` (${definition.tierId})` : "";
-  const setsLabel = matchResult.bundleSets > 1 ? ` x${matchResult.bundleSets}` : "";
-  const message = `Bundle discount${tierLabel}${setsLabel}`;
+  // BOGO free-item discount: applies to freeItems matched lines
+  if (matchResult.freeItemLines && matchResult.freeItemLines.length > 0) {
+    const freeTargets: ProductVariantTarget[] = matchResult.freeItemLines.map((ml) => ({
+      productVariant: {
+        id: ml.variantId,
+        quantity: ml.quantityUsed,
+      },
+    }));
 
-  return {
-    message,
-    targets,
-    value,
-  };
+    const freeDiscount = definition.freeItemDiscount || { type: "free_item" as const, value: 100 };
+    const freeValue = buildDiscountValue({ ...definition, discount: freeDiscount });
+    if (freeValue) {
+      discounts.push({
+        message: "Free item (BOGO)",
+        targets: freeTargets,
+        value: freeValue,
+      });
+    }
+  }
+
+  return discounts;
 }
 
 function buildDiscountValue(definition: BundleDefinition): Discount["value"] | null {
@@ -310,6 +402,15 @@ function buildDiscountValue(definition: BundleDefinition): Discount["value"] | n
     return {
       fixedAmount: {
         amount: discount.value.toString(),
+      },
+    };
+  }
+
+  if (discount.type === "free_item") {
+    // Free items get 100% discount
+    return {
+      percentage: {
+        value: "100",
       },
     };
   }

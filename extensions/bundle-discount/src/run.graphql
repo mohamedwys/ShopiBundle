@@ -14,6 +14,9 @@ query RunInput {
       attribute(key: "_bundle_id") {
         value
       }
+      tierAttribute: attribute(key: "_bundle_tier") {
+        value
+      }
     }
   }
   discountNode {
