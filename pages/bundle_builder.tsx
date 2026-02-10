@@ -47,9 +47,11 @@ type BundleTypeOption =
   | "BOGO"
   | "MIX_MATCH"
   | "FBT"
-  | "FREE_GIFT";
+  | "FREE_GIFT"
+  | "SUBSCRIPTION"
+  | "BUILD_YOUR_OWN";
 
-type DiscountType = "percentage" | "fixed";
+type DiscountType = "percentage" | "fixed" | "fixed_price" | "free_item";
 
 type BadgeStyle = "pill" | "ribbon" | "banner";
 
@@ -119,11 +121,27 @@ const BUNDLE_TYPES: Array<{
       "Reward customers with a free gift when they meet a minimum purchase threshold.",
     icon: PaintBrushFlatIcon,
   },
+  {
+    value: "SUBSCRIPTION",
+    label: "Subscription Bundle",
+    description:
+      "Recurring bundle with configurable delivery frequency. Customers subscribe and save on each delivery.",
+    icon: CartIcon,
+  },
+  {
+    value: "BUILD_YOUR_OWN",
+    label: "Build Your Own",
+    description:
+      "Customers build a custom bundle by selecting products from a curated pool with quantity constraints.",
+    icon: ProductIcon,
+  },
 ];
 
 const DISCOUNT_TYPE_OPTIONS = [
   { label: "Percentage (%)", value: "percentage" },
   { label: "Fixed Amount ($)", value: "fixed" },
+  { label: "Fixed Price ($)", value: "fixed_price" },
+  { label: "Free Item", value: "free_item" },
 ];
 
 const COLOR_SCHEME_OPTIONS = [
@@ -172,6 +190,8 @@ function bundleTypeToAPIType(
     MIX_MATCH: "MIX_MATCH",
     FBT: "FIXED",
     FREE_GIFT: "GIFT",
+    SUBSCRIPTION: "SUBSCRIPTION",
+    BUILD_YOUR_OWN: "BUILD_YOUR_OWN",
   };
   return mapping[type];
 }
@@ -507,6 +527,7 @@ interface Step3Props {
   onRemoveTier: (id: string) => void;
   onUpdateTier: (id: string, updates: Partial<BundleTierConfig>) => void;
   onSetDefault: (id: string) => void;
+  typeSpecificConfig: React.ReactNode;
 }
 
 function Step3TierConfig({
@@ -515,6 +536,7 @@ function Step3TierConfig({
   onRemoveTier,
   onUpdateTier,
   onSetDefault,
+  typeSpecificConfig,
 }: Step3Props) {
   return (
     <BlockStack gap="400">
@@ -655,6 +677,8 @@ function Step3TierConfig({
           Add tier
         </Button>
       </InlineStack>
+
+      {typeSpecificConfig}
     </BlockStack>
   );
 }
@@ -947,6 +971,8 @@ interface Step5Props {
   badgeStyle: BadgeStyle;
   showSavingsBadge: boolean;
   showComparePrice: boolean;
+  minProducts: number;
+  maxProducts: number;
 }
 
 function Step5Review({
@@ -961,6 +987,8 @@ function Step5Review({
   badgeStyle,
   showSavingsBadge,
   showComparePrice,
+  minProducts,
+  maxProducts,
 }: Step5Props) {
   const typeLabel =
     BUNDLE_TYPES.find((t) => t.value === bundleType)?.label ?? "Not selected";
@@ -1169,8 +1197,266 @@ function Step5Review({
           </InlineStack>
         </BlockStack>
       </Card>
+
+      {/* Type-specific review */}
+      {bundleType === "BOGO" && (
+        <Card>
+          <BlockStack gap="300">
+            <Text as="h3" variant="headingMd">BOGO Configuration</Text>
+            <Divider />
+            <Text as="p" variant="bodyMd">
+              Buy condition defined by tiers above. Get items configured separately.
+            </Text>
+          </BlockStack>
+        </Card>
+      )}
+
+      {(bundleType === "MIX_MATCH" || bundleType === "BUILD_YOUR_OWN") && (
+        <Card>
+          <BlockStack gap="300">
+            <Text as="h3" variant="headingMd">Selection Rules</Text>
+            <Divider />
+            <Text as="p" variant="bodyMd">
+              Customers select between {minProducts} and {maxProducts} products.
+            </Text>
+          </BlockStack>
+        </Card>
+      )}
     </BlockStack>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Component: TypeSpecificConfig — shown within Step 3 based on bundle type
+// ---------------------------------------------------------------------------
+
+interface TypeSpecificConfigProps {
+  bundleType: BundleTypeOption | null;
+  // BOGO
+  bogoGetQuantity: number;
+  setBogoGetQuantity: (v: number) => void;
+  bogoGetType: "free" | "percentage";
+  setBogoGetType: (v: "free" | "percentage") => void;
+  bogoGetDiscount: number;
+  setBogoGetDiscount: (v: number) => void;
+  // MIX_MATCH / BUILD_YOUR_OWN
+  minProducts: number;
+  setMinProducts: (v: number) => void;
+  maxProducts: number;
+  setMaxProducts: (v: number) => void;
+  // GIFT
+  allowGiftMessage: boolean;
+  setAllowGiftMessage: (v: boolean) => void;
+  maxMessageLength: number;
+  setMaxMessageLength: (v: number) => void;
+  allowGiftWrapping: boolean;
+  setAllowGiftWrapping: (v: boolean) => void;
+  // SUBSCRIPTION
+  subscriptionDiscount: number;
+  setSubscriptionDiscount: (v: number) => void;
+}
+
+function TypeSpecificConfig({
+  bundleType,
+  bogoGetQuantity,
+  setBogoGetQuantity,
+  bogoGetType,
+  setBogoGetType,
+  bogoGetDiscount,
+  setBogoGetDiscount,
+  minProducts,
+  setMinProducts,
+  maxProducts,
+  setMaxProducts,
+  allowGiftMessage,
+  setAllowGiftMessage,
+  maxMessageLength,
+  setMaxMessageLength,
+  allowGiftWrapping,
+  setAllowGiftWrapping,
+  subscriptionDiscount,
+  setSubscriptionDiscount,
+}: TypeSpecificConfigProps) {
+  if (!bundleType) return null;
+
+  switch (bundleType) {
+    case "BOGO":
+      return (
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h3" variant="headingMd">
+              BOGO Configuration
+            </Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Configure what the customer gets when they meet the buy condition.
+            </Text>
+            <TextField
+              label="Get Quantity"
+              type="number"
+              value={String(bogoGetQuantity)}
+              onChange={(v) => {
+                const n = parseInt(v, 10);
+                if (!isNaN(n) && n >= 1) setBogoGetQuantity(n);
+              }}
+              autoComplete="off"
+              helpText="How many items the customer gets (e.g., Buy 1 Get 1)"
+              min={1}
+            />
+            <Select
+              label="Get Discount Type"
+              options={[
+                { label: "Free (100% off)", value: "free" },
+                { label: "Percentage off", value: "percentage" },
+              ]}
+              value={bogoGetType}
+              onChange={(v) => setBogoGetType(v as "free" | "percentage")}
+            />
+            {bogoGetType === "percentage" && (
+              <RangeSlider
+                label="Discount Percentage"
+                value={bogoGetDiscount}
+                min={1}
+                max={100}
+                step={1}
+                output
+                onChange={(v) => setBogoGetDiscount(v as number)}
+                suffix={
+                  <Text as="span" variant="bodySm">
+                    {bogoGetDiscount}%
+                  </Text>
+                }
+              />
+            )}
+          </BlockStack>
+        </Card>
+      );
+
+    case "MIX_MATCH":
+    case "BUILD_YOUR_OWN":
+      return (
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h3" variant="headingMd">
+              Selection Rules
+            </Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Define how many products customers can pick for their bundle.
+            </Text>
+            <InlineStack gap="400">
+              <div style={{ flex: 1 }}>
+                <TextField
+                  label="Minimum Products"
+                  type="number"
+                  value={String(minProducts)}
+                  onChange={(v) => {
+                    const n = parseInt(v, 10);
+                    if (!isNaN(n) && n >= 1) setMinProducts(n);
+                  }}
+                  autoComplete="off"
+                  min={1}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <TextField
+                  label="Maximum Products"
+                  type="number"
+                  value={String(maxProducts)}
+                  onChange={(v) => {
+                    const n = parseInt(v, 10);
+                    if (!isNaN(n) && n >= 1) setMaxProducts(n);
+                  }}
+                  autoComplete="off"
+                  min={1}
+                />
+              </div>
+            </InlineStack>
+            {minProducts > maxProducts && (
+              <Banner tone="warning">
+                <Text as="p">
+                  Minimum products cannot exceed maximum products.
+                </Text>
+              </Banner>
+            )}
+          </BlockStack>
+        </Card>
+      );
+
+    case "FREE_GIFT":
+      return (
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h3" variant="headingMd">
+              Gift Options
+            </Text>
+            <Checkbox
+              label="Allow gift message"
+              helpText="Let customers write a personalized message."
+              checked={allowGiftMessage}
+              onChange={setAllowGiftMessage}
+            />
+            {allowGiftMessage && (
+              <TextField
+                label="Max Message Length"
+                type="number"
+                value={String(maxMessageLength)}
+                onChange={(v) => {
+                  const n = parseInt(v, 10);
+                  if (!isNaN(n) && n >= 10) setMaxMessageLength(n);
+                }}
+                autoComplete="off"
+                helpText="Maximum characters for the gift message."
+                min={10}
+                max={500}
+              />
+            )}
+            <Checkbox
+              label="Allow gift wrapping"
+              helpText="Offer gift wrapping options (configure options in settings)."
+              checked={allowGiftWrapping}
+              onChange={setAllowGiftWrapping}
+            />
+          </BlockStack>
+        </Card>
+      );
+
+    case "SUBSCRIPTION":
+      return (
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h3" variant="headingMd">
+              Subscription Settings
+            </Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Configure the recurring delivery and subscription discount.
+            </Text>
+            <RangeSlider
+              label="Subscription Discount"
+              value={subscriptionDiscount}
+              min={0}
+              max={50}
+              step={1}
+              output
+              onChange={(v) => setSubscriptionDiscount(v as number)}
+              suffix={
+                <Text as="span" variant="bodySm">
+                  {subscriptionDiscount}%
+                </Text>
+              }
+            />
+            <Banner tone="info">
+              <Text as="p">
+                Subscription bundles use Shopify Selling Plans. Delivery
+                frequencies are configurable after initial setup. Default
+                frequencies: Every 2 weeks, Monthly, Every 2 months.
+              </Text>
+            </Banner>
+          </BlockStack>
+        </Card>
+      );
+
+    default:
+      return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1210,6 +1496,37 @@ const BundleBuilderPage = () => {
   const [cornerRadius, setCornerRadius] = useState(8);
   const [showSavingsBadge, setShowSavingsBadge] = useState(true);
   const [showComparePrice, setShowComparePrice] = useState(true);
+
+  // ---- Type-specific configuration ----
+  // BOGO
+  const [bogoGetQuantity, setBogoGetQuantity] = useState(1);
+  const [bogoGetType, setBogoGetType] = useState<"free" | "percentage">("free");
+  const [bogoGetDiscount, setBogoGetDiscount] = useState(100);
+
+  // MIX_MATCH / BUILD_YOUR_OWN
+  const [minProducts, setMinProducts] = useState(2);
+  const [maxProducts, setMaxProducts] = useState(5);
+  const [componentGroups, setComponentGroups] = useState<Array<{
+    id: string;
+    name: string;
+    minSelect: number;
+    maxSelect: number;
+  }>>([]);
+
+  // GIFT
+  const [allowGiftMessage, setAllowGiftMessage] = useState(true);
+  const [maxMessageLength, setMaxMessageLength] = useState(200);
+  const [allowGiftWrapping, setAllowGiftWrapping] = useState(false);
+
+  // SUBSCRIPTION
+  const [subscriptionFrequencies, setSubscriptionFrequencies] = useState<
+    Array<{ value: string; label: string; intervalCount: number; interval: string }>
+  >([
+    { value: "2w", label: "Every 2 weeks", intervalCount: 2, interval: "WEEK" },
+    { value: "1m", label: "Monthly", intervalCount: 1, interval: "MONTH" },
+    { value: "2m", label: "Every 2 months", intervalCount: 2, interval: "MONTH" },
+  ]);
+  const [subscriptionDiscount, setSubscriptionDiscount] = useState(10);
 
   // ---- Toast state ----
   const [successToastActive, setSuccessToastActive] = useState(false);
@@ -1417,15 +1734,45 @@ const BundleBuilderPage = () => {
   const handlePublish = useCallback(async () => {
     if (!validateStep(currentStep)) return;
 
+    const apiType = bundleType ? bundleTypeToAPIType(bundleType) : undefined;
+
     const input: CreateBundleInput = {
       name: bundleName.trim(),
       title: bundleTitle.trim(),
+      type: apiType,
       description: description.trim() || undefined,
       discountPercent: primaryDiscount,
       components: selectedProducts.map((product) => ({
         shopifyProductId: product.id,
         quantity: 1,
       })),
+      // Type-specific config
+      ...(bundleType === "MIX_MATCH" || bundleType === "BUILD_YOUR_OWN"
+        ? {
+            selectionRules: {
+              minProducts,
+              maxProducts,
+            },
+          }
+        : {}),
+      ...(bundleType === "FREE_GIFT"
+        ? {
+            giftSettings: {
+              allowMessage: allowGiftMessage,
+              maxMessageLength,
+              allowWrapping: allowGiftWrapping,
+            },
+          }
+        : {}),
+      ...(bundleType === "SUBSCRIPTION"
+        ? {
+            subscriptionSettings: {
+              frequencies: subscriptionFrequencies,
+              defaultFrequency: subscriptionFrequencies[0]?.value || "1m",
+              discountPercent: subscriptionDiscount,
+            },
+          }
+        : {}),
     };
 
     const result = await createBundle(input);
@@ -1469,6 +1816,7 @@ const BundleBuilderPage = () => {
     const input: CreateBundleInput = {
       name: bundleName.trim(),
       title: bundleTitle.trim() || bundleName.trim(),
+      type: bundleType ? bundleTypeToAPIType(bundleType) : undefined,
       description: description.trim() || undefined,
       discountPercent: primaryDiscount,
       components: selectedProducts.map((product) => ({
@@ -1539,6 +1887,29 @@ const BundleBuilderPage = () => {
             onRemoveTier={removeTier}
             onUpdateTier={updateTier}
             onSetDefault={setDefaultTier}
+            typeSpecificConfig={
+              <TypeSpecificConfig
+                bundleType={bundleType}
+                bogoGetQuantity={bogoGetQuantity}
+                setBogoGetQuantity={setBogoGetQuantity}
+                bogoGetType={bogoGetType}
+                setBogoGetType={setBogoGetType}
+                bogoGetDiscount={bogoGetDiscount}
+                setBogoGetDiscount={setBogoGetDiscount}
+                minProducts={minProducts}
+                setMinProducts={setMinProducts}
+                maxProducts={maxProducts}
+                setMaxProducts={setMaxProducts}
+                allowGiftMessage={allowGiftMessage}
+                setAllowGiftMessage={setAllowGiftMessage}
+                maxMessageLength={maxMessageLength}
+                setMaxMessageLength={setMaxMessageLength}
+                allowGiftWrapping={allowGiftWrapping}
+                setAllowGiftWrapping={setAllowGiftWrapping}
+                subscriptionDiscount={subscriptionDiscount}
+                setSubscriptionDiscount={setSubscriptionDiscount}
+              />
+            }
           />
         );
       case 3:
@@ -1572,6 +1943,8 @@ const BundleBuilderPage = () => {
             badgeStyle={badgeStyle}
             showSavingsBadge={showSavingsBadge}
             showComparePrice={showComparePrice}
+            minProducts={minProducts}
+            maxProducts={maxProducts}
           />
         );
       default:

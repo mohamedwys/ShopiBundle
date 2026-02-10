@@ -86,15 +86,44 @@ export interface GetBundleResponse {
 export interface CreateBundleInput {
   name: string;
   title: string;
+  type?: string;
   description?: string;
   components: Array<{
     shopifyProductId: string;
     shopifyVariantId?: string;
     quantity?: number;
+    isRequired?: boolean;
   }>;
   discountPercent: number;
   tags?: string[];
   featuredImage?: string;
+
+  // Type-specific JSON config
+  selectionRules?: {
+    minProducts: number;
+    maxProducts: number;
+    componentGroups?: Array<{
+      id: string;
+      name: string;
+      minSelect: number;
+      maxSelect: number;
+    }>;
+  };
+  giftSettings?: {
+    allowMessage: boolean;
+    maxMessageLength: number;
+    allowWrapping: boolean;
+  };
+  subscriptionSettings?: {
+    frequencies: Array<{
+      value: string;
+      label: string;
+      intervalCount: number;
+      interval: string;
+    }>;
+    defaultFrequency: string;
+    discountPercent: number;
+  };
 }
 
 // Update bundle input
