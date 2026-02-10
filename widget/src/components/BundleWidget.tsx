@@ -17,6 +17,8 @@ import { ProductSelector } from './ProductSelector';
 import { QuantitySelector } from './QuantitySelector';
 import { EmptyState } from './EmptyState';
 import { ErrorBanner } from './ErrorBanner';
+import { GiftOptions } from './GiftOptions';
+import { FrequencyPicker } from './FrequencyPicker';
 
 type AddToCartState = 'idle' | 'loading' | 'success' | 'error';
 
@@ -67,6 +69,15 @@ export function BundleWidget({
 
   // Bundle quantity for quantity selector
   const [bundleQuantity, setBundleQuantity] = useState<number>(1);
+
+  // Gift options state
+  const [giftMessage, setGiftMessage] = useState('');
+  const [giftWrappingId, setGiftWrappingId] = useState<string | null>(null);
+
+  // Subscription frequency state
+  const [subscriptionFrequency, setSubscriptionFrequency] = useState<string>(
+    config.subscriptionSettings?.defaultFrequency || ''
+  );
 
   const selectedTier = useMemo(
     () => tiers.find((t) => t.id === selectedTierId) || defaultTier,
