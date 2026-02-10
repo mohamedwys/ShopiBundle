@@ -125,6 +125,23 @@ async function handler(ctx: ApiContext): Promise<void> {
       }
     }
 
+    // Check feature flags for non-FIXED bundle types
+    const typeToFlag: Record<string, string> = {
+      'BOGO': 'BOGO_BUNDLES',
+      'TIERED': 'TIERED_PRICING',
+      'MIX_MATCH': 'MIX_MATCH_BUNDLES',
+      'BUILD_YOUR_OWN': 'BUILD_YOUR_OWN',
+      'SUBSCRIPTION': 'SUBSCRIPTION_BUNDLES',
+      'GIFT': 'GIFT_BUNDLES',
+    };
+
+    if (bundleType && typeToFlag[bundleType]) {
+      const flag = typeToFlag[bundleType] as any;
+      if (!isFeatureEnabled(flag)) {
+        return sendError(res, `Bundle type ${bundleType} is not enabled. Contact support to enable this feature.`, 403);
+      }
+    }
+
     const input: CreateBundleInput = {
       shop,
       name: body.name.trim(),

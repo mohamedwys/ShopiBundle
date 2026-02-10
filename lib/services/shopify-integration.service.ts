@@ -12,6 +12,7 @@
 
 import { createShopifyClient, RateLimitedShopifyClient } from '@/lib/shopify/client';
 import { logger, createBundleLogger } from '@/lib/monitoring/logger';
+import { getSellingPlansService, SubscriptionConfig } from './selling-plans.service';
 
 // Types for bundle data needed for Shopify integration
 export interface BundleShopifyData {
@@ -49,6 +50,7 @@ export interface BundleShopifyData {
 export interface ShopifyIntegrationResult {
   metaobjectId: string | null;
   discountId: string | null;
+  sellingPlanGroupId?: string | null;
   errors: string[];
 }
 
@@ -310,7 +312,42 @@ export class ShopifyIntegrationService {
       errors.push(errorMsg);
     }
 
-    return { metaobjectId, discountId, errors };
+    // Create selling plan group for subscription bundles
+    let sellingPlanGroupId: string | null = null;
+    if (bundle.bundleType === 'SUBSCRIPTION' && bundle.subscriptionSettings) {
+      try {
+        let subscriptionConfig: SubscriptionConfig;
+        try {
+          const settings = JSON.parse(bundle.subscriptionSettings);
+          subscriptionConfig = {
+            bundleId: bundle.id,
+            bundleName: bundle.name,
+            frequencies: settings.frequencies || [],
+            discountPercent: settings.discountPercent || 0,
+            productIds: bundle.components.map((c) => c.shopifyProductId),
+          };
+        } catch (parseError: any) {
+          throw new Error(`Invalid subscription settings JSON: ${parseError.message}`);
+        }
+
+        const sellingPlansService = getSellingPlansService();
+        const spResult = await sellingPlansService.createSellingPlanGroup(client, subscriptionConfig);
+
+        if (spResult.sellingPlanGroupId) {
+          sellingPlanGroupId = spResult.sellingPlanGroupId;
+          log.info('Selling plan group created', { sellingPlanGroupId });
+        }
+        if (spResult.errors.length > 0) {
+          errors.push(...spResult.errors);
+        }
+      } catch (error: any) {
+        const errorMsg = `Failed to create selling plan group: ${error.message}`;
+        log.error(errorMsg, { error: error.message });
+        errors.push(errorMsg);
+      }
+    }
+
+    return { metaobjectId, discountId, sellingPlanGroupId, errors };
   }
 
   /**

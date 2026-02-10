@@ -51,16 +51,16 @@ const DEFAULT_FLAGS: FeatureFlags = {
   TIERED_PRICING: true,
   WEBHOOK_INVENTORY: true,
 
-  // Sprint 5-6: Mix & Match
-  MIX_MATCH_BUNDLES: false,
-  BUILD_YOUR_OWN: false,
-  COMPONENT_GROUPS: false,
-  THEME_EXTENSION_V2: false,
+  // Sprint 5-6: Mix & Match - ENABLED
+  MIX_MATCH_BUNDLES: true,
+  BUILD_YOUR_OWN: true,
+  COMPONENT_GROUPS: true,
+  THEME_EXTENSION_V2: true,
 
-  // Sprint 7-8: Advanced
-  SUBSCRIPTION_BUNDLES: false,
-  GIFT_BUNDLES: false,
-  DISCOUNT_STACKING_CONFIG: false,
+  // Sprint 7-8: Advanced - ENABLED
+  SUBSCRIPTION_BUNDLES: true,
+  GIFT_BUNDLES: true,
+  DISCOUNT_STACKING_CONFIG: true,
   CHECKOUT_UI_EXTENSION: false,
 
   // Sprint 9-10: Polish

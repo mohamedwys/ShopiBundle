@@ -280,6 +280,7 @@ model Bundle {
   // Shopify References
   shopifyProductId      String?
   shopifyMetaobjectId   String?
+  sellingPlanGroupId    String?
 
   // Display Settings
   displayOrder          Int                 @default(0)

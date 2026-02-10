@@ -319,6 +319,36 @@ async function cleanupShopifyResources(
       errors
     );
   }
+
+  // --- Delete selling plan groups ---
+  const bundlesWithSellingPlans = await prisma.bundle.findMany({
+    where: { shop, sellingPlanGroupId: { not: null } },
+    select: { sellingPlanGroupId: true },
+  });
+
+  console.log(`[Uninstall] Deleting ${bundlesWithSellingPlans.length} selling plan groups for ${shop}`);
+
+  for (const bundle of bundlesWithSellingPlans) {
+    if (bundle.sellingPlanGroupId) {
+      await retryOnRateLimit(
+        async () => {
+          await client.request(`
+            mutation DeleteSellingPlanGroup($id: ID!) {
+              sellingPlanGroupDelete(id: $id) {
+                deletedSellingPlanGroupId
+                userErrors { message }
+              }
+            }
+          `, {
+            variables: { id: bundle.sellingPlanGroupId },
+          });
+        },
+        `selling plan group ${bundle.sellingPlanGroupId}`,
+        shop,
+        errors
+      );
+    }
+  }
 }
 
 /**
