@@ -308,6 +308,18 @@ function buildWidgetConfig(params: {
       bundleType = "fbt";
       tiers = buildFbtTiers(discount);
       break;
+    case "BUILD_YOUR_OWN":
+      bundleType = "build-your-own";
+      tiers = buildFixedTiers(discount, products);
+      break;
+    case "SUBSCRIPTION":
+      bundleType = "subscription";
+      tiers = buildFixedTiers(discount, products);
+      break;
+    case "GIFT":
+      bundleType = "gift";
+      tiers = buildFixedTiers(discount, products);
+      break;
     default:
       bundleType = "fixed";
       tiers = buildFixedTiers(discount, products);
@@ -345,10 +357,15 @@ function buildWidgetConfig(params: {
       moneyFormat: "${{amount}}",
       addToCartBehavior: "drawer",
       showQuantitySelector: false,
+      minQuantity: 1,
       maxQuantity: 10,
       allowVariantSelection: true,
       outOfStockBehavior: "disable",
     },
+    // Parse type-specific settings from metadata JSON fields
+    ...(metadata.selectionRules ? { selectionRules: JSON.parse(metadata.selectionRules) } : {}),
+    ...(metadata.giftSettings ? { giftSettings: JSON.parse(metadata.giftSettings) } : {}),
+    ...(metadata.subscriptionSettings ? { subscriptionSettings: JSON.parse(metadata.subscriptionSettings) } : {}),
   };
 }
 

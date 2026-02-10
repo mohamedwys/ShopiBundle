@@ -167,6 +167,7 @@ export interface CartLineItem {
   quantity: number;
   price: number;
   properties: Record<string, string>;
+  selling_plan?: string;
 }
 
 // ============================================

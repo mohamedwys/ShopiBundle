@@ -182,6 +182,9 @@ export function BundleWidget({
           ...item.properties,
           _bundle_id: config.id,
           ...(selectedTier?.id ? { _bundle_tier: selectedTier.id } : {}),
+          ...(giftMessage ? { _gift_message: giftMessage } : {}),
+          ...(giftWrappingId ? { _gift_wrapping: giftWrappingId } : {}),
+          ...(subscriptionFrequency ? { _subscription_frequency: subscriptionFrequency } : {}),
         },
       };
     });
@@ -228,6 +231,9 @@ export function BundleWidget({
     settings.addToCartBehavior,
     onAddToCart,
     analytics,
+    giftMessage,
+    giftWrappingId,
+    subscriptionFrequency,
   ]);
 
   if (!tiers.length && !products.length) {
@@ -311,6 +317,29 @@ export function BundleWidget({
             onChange={setBundleQuantity}
           />
         </div>
+      )}
+
+      {/* Gift options for GIFT bundles */}
+      {config.type === 'gift' && config.giftSettings && (
+        <GiftOptions
+          allowMessage={config.giftSettings.allowMessage}
+          maxMessageLength={config.giftSettings.maxMessageLength}
+          allowWrapping={config.giftSettings.allowWrapping}
+          wrappingOptions={config.giftSettings.wrappingOptions || []}
+          moneyFormat={settings.moneyFormat}
+          onGiftMessageChange={setGiftMessage}
+          onWrappingChange={setGiftWrappingId}
+        />
+      )}
+
+      {/* Subscription frequency for SUBSCRIPTION bundles */}
+      {config.type === 'subscription' && config.subscriptionSettings && (
+        <FrequencyPicker
+          frequencies={config.subscriptionSettings.frequencies}
+          defaultFrequency={config.subscriptionSettings.defaultFrequency}
+          discountPercent={config.subscriptionSettings.discountPercent}
+          onChange={setSubscriptionFrequency}
+        />
       )}
 
       {/* Offer tier cards */}

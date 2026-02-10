@@ -14,7 +14,14 @@ export async function addToCart(payload: CartAddPayload): Promise<CartResponse> 
   const response = await fetch('/cart/add.js', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items: payload.items }),
+    body: JSON.stringify({
+      items: payload.items.map((item) => ({
+        id: item.variantId,
+        quantity: item.quantity,
+        properties: item.properties,
+        ...(item.selling_plan ? { selling_plan: item.selling_plan } : {}),
+      })),
+    }),
   });
 
   if (!response.ok) {
