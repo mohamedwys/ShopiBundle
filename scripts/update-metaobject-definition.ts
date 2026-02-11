@@ -8,6 +8,24 @@
  * Usage: npx ts-node scripts/update-metaobject-definition.ts <shop-domain>
  */
 
+import clientProvider from '@/utils/clientProvider';
+
+const FIND_DEFINITION_QUERY = `
+  query FindBundleMetaobjectDefinition {
+    metaobjectDefinitions(first: 50) {
+      edges {
+        node {
+          id
+          type
+          fieldDefinitions {
+            key
+          }
+        }
+      }
+    }
+  }
+`;
+
 const MUTATION = `
   mutation UpdateBundleMetaobjectDefinition($id: ID!, $definition: MetaobjectDefinitionUpdateInput!) {
     metaobjectDefinitionUpdate(id: $id, definition: $definition) {
@@ -59,9 +77,77 @@ const NEW_FIELDS = [
   },
 ];
 
-console.log('Metaobject definition update mutation:');
-console.log(JSON.stringify({ mutation: MUTATION, newFields: NEW_FIELDS }, null, 2));
-console.log('\nRun this mutation via the Shopify Admin GraphQL API.');
-console.log('First, find the metaobject definition ID:');
-console.log('  query { metaobjectDefinitions(first: 10) { edges { node { id type } } } }');
-console.log('Then call metaobjectDefinitionUpdate with the ID and new fieldDefinitions.');
+async function main() {
+  const shopDomain = process.argv[2];
+  if (!shopDomain) {
+    console.error('Usage: npx ts-node scripts/update-metaobject-definition.ts <shop-domain>');
+    process.exit(1);
+  }
+
+  console.log(`Updating metaobject definition for shop: ${shopDomain}`);
+
+  // Get offline client
+  const { client } = await clientProvider.offline.graphqlClient({ shop: shopDomain });
+
+  // Find the product-bundles metaobject definition
+  const defsResponse: any = await client.request(FIND_DEFINITION_QUERY);
+  const definitions = defsResponse.data?.metaobjectDefinitions?.edges || [];
+
+  const bundleDef = definitions.find(
+    (edge: any) => edge.node.type === 'product-bundles'
+  );
+
+  if (!bundleDef) {
+    console.error('No "product-bundles" metaobject definition found. Has the app been installed?');
+    process.exit(1);
+  }
+
+  const definitionId = bundleDef.node.id;
+  const existingKeys = new Set(bundleDef.node.fieldDefinitions.map((f: any) => f.key));
+
+  // Filter to only fields that don't already exist
+  const fieldsToAdd = NEW_FIELDS.filter((f) => !existingKeys.has(f.key));
+
+  if (fieldsToAdd.length === 0) {
+    console.log('All fields already exist. Nothing to update.');
+    return;
+  }
+
+  console.log(`Adding ${fieldsToAdd.length} new fields: ${fieldsToAdd.map((f) => f.key).join(', ')}`);
+
+  // Execute the mutation
+  const response: any = await client.request(MUTATION, {
+    variables: {
+      id: definitionId,
+      definition: {
+        fieldDefinitions: fieldsToAdd.map((f) => ({
+          create: {
+            key: f.key,
+            name: f.name,
+            type: f.type,
+            description: f.description,
+          },
+        })),
+      },
+    },
+  });
+
+  const result = response.data?.metaobjectDefinitionUpdate;
+  if (!result) {
+    console.error('No response from mutation');
+    process.exit(1);
+  }
+
+  if (result.userErrors?.length > 0) {
+    console.error('Mutation errors:', result.userErrors);
+    process.exit(1);
+  }
+
+  console.log('Metaobject definition updated successfully.');
+  console.log('Fields:', result.metaobjectDefinition.fieldDefinitions.map((f: any) => f.key).join(', '));
+}
+
+main().catch((err) => {
+  console.error('Migration failed:', err);
+  process.exit(1);
+});

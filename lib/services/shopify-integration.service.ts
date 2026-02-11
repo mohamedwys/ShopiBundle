@@ -336,6 +336,21 @@ export class ShopifyIntegrationService {
         if (spResult.sellingPlanGroupId) {
           sellingPlanGroupId = spResult.sellingPlanGroupId;
           log.info('Selling plan group created', { sellingPlanGroupId });
+
+          // Enrich metaobject subscription_settings with selling plan IDs
+          // so the storefront widget can pass them to the cart API
+          if (metaobjectId && Object.keys(spResult.sellingPlanIds).length > 0) {
+            try {
+              const settings = JSON.parse(bundle.subscriptionSettings!);
+              for (const freq of settings.frequencies || []) {
+                freq.sellingPlanId = spResult.sellingPlanIds[freq.label] || null;
+              }
+              settings.sellingPlanGroupId = sellingPlanGroupId;
+              await this.updateMetaobjectField(client, metaobjectId, 'subscription_settings', JSON.stringify(settings));
+            } catch (enrichError: any) {
+              log.warn('Failed to enrich metaobject with selling plan IDs', { error: enrichError.message });
+            }
+          }
         }
         if (spResult.errors.length > 0) {
           errors.push(...spResult.errors);
@@ -398,7 +413,8 @@ export class ShopifyIntegrationService {
   async onBundleUnpublish(
     bundleId: string,
     shop: string,
-    discountId: string | null
+    discountId: string | null,
+    sellingPlanGroupId?: string | null
   ): Promise<{ success: boolean; errors: string[] }> {
     const log = createBundleLogger(bundleId, shop);
     const client = this.getClient(shop);
@@ -411,6 +427,20 @@ export class ShopifyIntegrationService {
         log.info('Discount deactivated', { discountId });
       } catch (error: any) {
         const errorMsg = `Failed to deactivate discount: ${error.message}`;
+        log.error(errorMsg, { error: error.message });
+        errors.push(errorMsg);
+      }
+    }
+
+    // Delete selling plan group for subscription bundles
+    if (sellingPlanGroupId) {
+      try {
+        log.info('Deleting selling plan group', { sellingPlanGroupId });
+        const sellingPlansService = getSellingPlansService();
+        await sellingPlansService.deleteSellingPlanGroup(client, sellingPlanGroupId);
+        log.info('Selling plan group deleted', { sellingPlanGroupId });
+      } catch (error: any) {
+        const errorMsg = `Failed to delete selling plan group: ${error.message}`;
         log.error(errorMsg, { error: error.message });
         errors.push(errorMsg);
       }
@@ -453,7 +483,8 @@ export class ShopifyIntegrationService {
     bundleId: string,
     shop: string,
     metaobjectId: string | null,
-    discountId: string | null
+    discountId: string | null,
+    sellingPlanGroupId?: string | null
   ): Promise<{ success: boolean; errors: string[] }> {
     const log = createBundleLogger(bundleId, shop);
     const client = this.getClient(shop);
@@ -480,6 +511,20 @@ export class ShopifyIntegrationService {
         log.info('Discount deleted', { discountId });
       } catch (error: any) {
         const errorMsg = `Failed to delete discount: ${error.message}`;
+        log.error(errorMsg, { error: error.message });
+        errors.push(errorMsg);
+      }
+    }
+
+    // Delete selling plan group
+    if (sellingPlanGroupId) {
+      try {
+        log.info('Deleting selling plan group', { sellingPlanGroupId });
+        const sellingPlansService = getSellingPlansService();
+        await sellingPlansService.deleteSellingPlanGroup(client, sellingPlanGroupId);
+        log.info('Selling plan group deleted', { sellingPlanGroupId });
+      } catch (error: any) {
+        const errorMsg = `Failed to delete selling plan group: ${error.message}`;
         log.error(errorMsg, { error: error.message });
         errors.push(errorMsg);
       }
@@ -554,9 +599,10 @@ export class ShopifyIntegrationService {
           { key: 'description', value: bundle.description || '' },
           { key: 'discount', value: String(Math.round(bundle.discountPercent)) },
           { key: 'products', value: JSON.stringify(productIds) },
-          ...(bundle.selectionRules ? [{ key: 'selection_rules', value: bundle.selectionRules }] : []),
-          ...(bundle.giftSettings ? [{ key: 'gift_settings', value: bundle.giftSettings }] : []),
-          ...(bundle.subscriptionSettings ? [{ key: 'subscription_settings', value: bundle.subscriptionSettings }] : []),
+          // Always send type-specific fields to clear stale data when bundle type changes
+          { key: 'selection_rules', value: bundle.selectionRules || '' },
+          { key: 'gift_settings', value: bundle.giftSettings || '' },
+          { key: 'subscription_settings', value: bundle.subscriptionSettings || '' },
         ],
       },
     });
@@ -565,6 +611,20 @@ export class ShopifyIntegrationService {
     if (result?.userErrors && result.userErrors.length > 0) {
       throw new Error(result.userErrors.map((e) => e.message).join(', '));
     }
+  }
+
+  private async updateMetaobjectField(
+    client: RateLimitedShopifyClient,
+    metaobjectId: string,
+    key: string,
+    value: string
+  ): Promise<void> {
+    await client.mutate<MetaobjectUpdateResponse>(METAOBJECT_UPDATE_MUTATION, {
+      id: metaobjectId,
+      metaobject: {
+        fields: [{ key, value }],
+      },
+    });
   }
 
   private async deleteMetaobject(

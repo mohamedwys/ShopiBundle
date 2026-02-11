@@ -166,6 +166,13 @@ export function BundleWidget({
     setErrorMessage('');
     analytics.trackAddToCart(selectedTier, currentPricing);
 
+    // Resolve selling plan ID for subscription bundles
+    const sellingPlanId = config.type === 'subscription' && subscriptionFrequency
+      ? config.subscriptionSettings?.frequencies.find(
+          (f) => f.value === subscriptionFrequency
+        )?.sellingPlanId
+      : undefined;
+
     // Build cart payload with correct variant IDs
     const lineItems = currentPricing.lineItems.map((item) => {
       const overrideVariantId = Object.entries(variantSelections).find(
@@ -178,6 +185,8 @@ export function BundleWidget({
           variantSelections[
             products.find((p) => p.variantId === item.variantId)?.productId || ''
           ] || item.variantId,
+        // Attach selling plan for subscription bundles
+        ...(sellingPlanId ? { selling_plan: sellingPlanId } : {}),
         properties: {
           ...item.properties,
           _bundle_id: config.id,
@@ -192,6 +201,8 @@ export function BundleWidget({
     const payload: CartAddPayload = {
       items: lineItems.map((item) => ({
         ...item,
+        // Apply bundle quantity multiplier
+        quantity: item.quantity * bundleQuantity,
         // Shopify expects numeric IDs without gid:// prefix
         variantId: stripGid(item.variantId),
       })),
@@ -228,12 +239,15 @@ export function BundleWidget({
     variantSelections,
     products,
     config.id,
+    config.type,
+    config.subscriptionSettings,
     settings.addToCartBehavior,
     onAddToCart,
     analytics,
     giftMessage,
     giftWrappingId,
     subscriptionFrequency,
+    bundleQuantity,
   ]);
 
   if (!tiers.length && !products.length) {

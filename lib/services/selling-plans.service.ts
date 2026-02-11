@@ -33,6 +33,8 @@ export interface SubscriptionConfig {
 
 export interface SellingPlanGroupResult {
   sellingPlanGroupId: string | null;
+  /** Map of selling plan name → Shopify selling plan ID */
+  sellingPlanIds: Record<string, string>;
   errors: string[];
 }
 
@@ -176,7 +178,10 @@ export class SellingPlansService {
 
       const response = await client.mutate<{
         sellingPlanGroupCreate: {
-          sellingPlanGroup: { id: string } | null;
+          sellingPlanGroup: {
+            id: string;
+            sellingPlans: { edges: Array<{ node: { id: string; name: string } }> };
+          } | null;
           userErrors: Array<{ field: string[]; message: string; code: string }>;
         };
       }>(SELLING_PLAN_GROUP_CREATE, {
@@ -194,18 +199,24 @@ export class SellingPlansService {
       const result = response.data?.sellingPlanGroupCreate;
       if (!result) {
         errors.push('No response from selling plan group creation');
-        return { sellingPlanGroupId: null, errors };
+        return { sellingPlanGroupId: null, sellingPlanIds: {}, errors };
       }
 
       if (result.userErrors.length > 0) {
         const errorMessages = result.userErrors.map((e) => e.message).join(', ');
         errors.push(`Selling plan group errors: ${errorMessages}`);
-        return { sellingPlanGroupId: null, errors };
+        return { sellingPlanGroupId: null, sellingPlanIds: {}, errors };
       }
 
       if (!result.sellingPlanGroup) {
         errors.push('Selling plan group creation returned no group');
-        return { sellingPlanGroupId: null, errors };
+        return { sellingPlanGroupId: null, sellingPlanIds: {}, errors };
+      }
+
+      // Build name → ID map for individual selling plans
+      const sellingPlanIds: Record<string, string> = {};
+      for (const edge of result.sellingPlanGroup.sellingPlans?.edges || []) {
+        sellingPlanIds[edge.node.name] = edge.node.id;
       }
 
       logger.info('Created selling plan group', {
@@ -214,14 +225,14 @@ export class SellingPlansService {
         planCount: config.frequencies.length,
       });
 
-      return { sellingPlanGroupId: result.sellingPlanGroup.id, errors: [] };
+      return { sellingPlanGroupId: result.sellingPlanGroup.id, sellingPlanIds, errors: [] };
     } catch (error: any) {
       errors.push(`Failed to create selling plan group: ${error.message}`);
       logger.error('Selling plan group creation failed', {
         bundleId: config.bundleId,
         error: error.message,
       });
-      return { sellingPlanGroupId: null, errors };
+      return { sellingPlanGroupId: null, sellingPlanIds: {}, errors };
     }
   }
 

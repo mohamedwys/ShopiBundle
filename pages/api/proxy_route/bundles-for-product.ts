@@ -73,7 +73,7 @@ async function handler(
     const response: any = await client.request(query, {
       variables: {
         type: "product-bundles",
-        first: 50,
+        first: 250,
       },
     });
 

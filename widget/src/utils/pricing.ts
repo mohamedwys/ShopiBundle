@@ -33,8 +33,9 @@ export function calculateTierPricing(
     case 'subscription':
       return calculateFixedPricing(tier, products);
     case 'free-gift':
-    case 'gift':
       return calculateFreeGiftPricing(tier, products);
+    case 'gift':
+      return calculateFixedPricing(tier, products);
     default:
       return calculateFixedPricing(tier, products);
   }

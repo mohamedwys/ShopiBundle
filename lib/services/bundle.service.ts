@@ -484,13 +484,16 @@ export class BundleService {
     const shopifyDiscountId = bundle.discounts[0]?.shopifyDiscountId || null;
     const shopifyMetaobjectId = bundle.shopifyMetaobjectId;
 
-    if (shopifyMetaobjectId || shopifyDiscountId) {
-      log.info('Deleting Shopify resources', { shopifyMetaobjectId, shopifyDiscountId });
+    const sellingPlanGroupId = bundle.sellingPlanGroupId;
+
+    if (shopifyMetaobjectId || shopifyDiscountId || sellingPlanGroupId) {
+      log.info('Deleting Shopify resources', { shopifyMetaobjectId, shopifyDiscountId, sellingPlanGroupId });
       const result = await this.shopifyIntegration.onBundleDelete(
         bundleId,
         shop,
         shopifyMetaobjectId,
-        shopifyDiscountId
+        shopifyDiscountId,
+        sellingPlanGroupId
       );
 
       if (result.errors.length > 0) {
@@ -780,30 +783,39 @@ export class BundleService {
       throw new Error('Bundle not found');
     }
 
-    // Deactivate Shopify discount
+    // Deactivate Shopify discount and clean selling plans
     const shopifyDiscountId = bundle.discounts[0]?.shopifyDiscountId || null;
-    if (shopifyDiscountId) {
-      log.info('Deactivating Shopify discount');
+    const sellingPlanGroupId = bundle.sellingPlanGroupId;
+
+    if (shopifyDiscountId || sellingPlanGroupId) {
+      log.info('Deactivating Shopify resources');
       const result = await this.shopifyIntegration.onBundleUnpublish(
         bundleId,
         shop,
-        shopifyDiscountId
+        shopifyDiscountId,
+        sellingPlanGroupId
       );
 
       if (result.errors.length > 0) {
-        log.warn('Failed to deactivate discount', { errors: result.errors });
+        log.warn('Failed to deactivate Shopify resources', { errors: result.errors });
       }
 
-      // Mark discount as inactive in database
-      await prisma.bundleDiscount.updateMany({
-        where: { bundleId, shopifyDiscountId },
-        data: { isActive: false },
-      });
+      if (shopifyDiscountId) {
+        // Mark discount as inactive in database
+        await prisma.bundleDiscount.updateMany({
+          where: { bundleId, shopifyDiscountId },
+          data: { isActive: false },
+        });
+      }
     }
 
     const updated = await prisma.bundle.update({
       where: { id: bundleId },
-      data: { status: 'PAUSED' },
+      data: {
+        status: 'PAUSED',
+        // Clear selling plan group ID since it was deleted
+        ...(sellingPlanGroupId ? { sellingPlanGroupId: null } : {}),
+      },
       include: {
         components: { orderBy: { displayOrder: 'asc' } },
         pricingRules: { where: { isActive: true } },
@@ -868,11 +880,38 @@ export class BundleService {
   }
 
   private async enrichBundleWithPricing(bundle: any): Promise<BundleWithPricing> {
-    // Calculate pricing
-    const pricing = this.pricingService.calculateFixedBundlePrice(
-      bundle.components,
-      bundle.pricingRules?.[0]?.discountValue || 0
-    );
+    // Calculate pricing based on bundle type
+    let pricing;
+    const primaryRule = bundle.pricingRules?.[0];
+    const discountValue = primaryRule?.discountValue || 0;
+
+    switch (bundle.type) {
+      case 'BOGO': {
+        const buyComponents = bundle.components.filter((c: any) => c.isRequired !== false);
+        const freeComponents = bundle.components.filter((c: any) => c.isRequired === false);
+        pricing = this.pricingService.calculateBogoBundlePrice(
+          buyComponents,
+          freeComponents.length > 0 ? freeComponents : buyComponents.slice(-1),
+          primaryRule || { discountType: 'FREE_ITEM', discountValue: 0, ruleType: 'BOGO', isActive: true }
+        );
+        break;
+      }
+      case 'MIX_MATCH':
+      case 'BUILD_YOUR_OWN':
+        pricing = this.pricingService.calculateMixMatchBundlePrice(
+          bundle.components,
+          primaryRule || { discountType: 'PERCENTAGE', discountValue, ruleType: 'BUNDLE_DISCOUNT', isActive: true }
+        );
+        break;
+      case 'TIERED':
+        pricing = bundle.pricingRules?.length > 0
+          ? this.pricingService.calculateBundlePrice(bundle.components, bundle.pricingRules)
+          : this.pricingService.calculateFixedBundlePrice(bundle.components, discountValue);
+        break;
+      default:
+        pricing = this.pricingService.calculateFixedBundlePrice(bundle.components, discountValue);
+        break;
+    }
 
     // Get inventory data if feature is enabled
     let inventory: BundleWithPricing['inventory'] = undefined;

@@ -1791,12 +1791,20 @@ const BundleBuilderPage = () => {
     currentStep,
     bundleName,
     bundleTitle,
+    bundleType,
     description,
     primaryDiscount,
     selectedProducts,
     createBundle,
     error,
     router,
+    minProducts,
+    maxProducts,
+    allowGiftMessage,
+    maxMessageLength,
+    allowGiftWrapping,
+    subscriptionFrequencies,
+    subscriptionDiscount,
   ]);
 
   const handleSaveDraft = useCallback(async () => {

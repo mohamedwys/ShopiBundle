@@ -60,9 +60,10 @@ export interface BundleConfig {
 
   // Subscription settings
   subscriptionSettings?: {
-    frequencies: Array<{ value: string; label: string; intervalCount: number; interval: 'DAY' | 'WEEK' | 'MONTH' | 'YEAR' }>;
+    frequencies: Array<{ value: string; label: string; intervalCount: number; interval: 'DAY' | 'WEEK' | 'MONTH' | 'YEAR'; sellingPlanId?: string }>;
     defaultFrequency: string;
     discountPercent: number;
+    sellingPlanGroupId?: string;
   };
 }
 

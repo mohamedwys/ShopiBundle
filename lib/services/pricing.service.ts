@@ -401,6 +401,14 @@ export class PricingService {
     if (primaryRule.ruleType === 'VOLUME_TIER') {
       const tierRules = validRules.filter(r => r.ruleType === 'VOLUME_TIER');
       result = this.calculateTieredBundlePrice(components, tierRules, context?.quantity || 1);
+    } else if (primaryRule.ruleType === 'BOGO') {
+      const buyComponents = components.filter(c => (c as any).isRequired !== false);
+      const freeComponents = components.filter(c => (c as any).isRequired === false);
+      result = this.calculateBogoBundlePrice(
+        buyComponents,
+        freeComponents.length > 0 ? freeComponents : buyComponents.slice(-1),
+        primaryRule
+      );
     } else {
       result = this.calculateWithDiscount(
         components,
@@ -439,7 +447,8 @@ export class PricingService {
       };
     }
 
-    const bundleType = primaryRule.ruleType === 'VOLUME_TIER' ? 'TIERED' : 'FIXED';
+    const bundleType = primaryRule.ruleType === 'VOLUME_TIER' ? 'TIERED'
+      : primaryRule.ruleType === 'BOGO' ? 'BOGO' : 'FIXED';
     PricingMetrics.calculated(bundleType, 0);
 
     return result;
