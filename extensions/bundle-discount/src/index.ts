@@ -112,7 +112,7 @@ function parseConfig(input: RunInput): BundleDiscountConfig | null {
       if (!Array.isArray(bundle.components) || bundle.components.length === 0) {
         return null;
       }
-      if (!bundle.discount || !bundle.discount.type || bundle.discount.value <= 0) {
+      if (!bundle.discount || !bundle.discount.type || bundle.discount.value < 0) {
         return null;
       }
       for (const comp of bundle.components) {
