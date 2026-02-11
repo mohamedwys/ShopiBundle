@@ -121,9 +121,14 @@ class InventoryService {
     // COMPONENT_BASED: Calculate based on component inventory
     const componentInventories: ComponentInventory[] = [];
     let minAvailable = Infinity;
+    let hasAnySyncedInventory = false;
 
     for (const component of bundle.components) {
-      const inventoryLevel = component.cachedInventory || 0;
+      // cachedInventory is null until the first Shopify sync
+      const hasSynced = component.cachedInventory !== null && component.cachedInventory !== undefined;
+      if (hasSynced) hasAnySyncedInventory = true;
+
+      const inventoryLevel = component.cachedInventory ?? 0;
       const requiredQty = component.quantity || 1;
       const availableForBundle = Math.floor(inventoryLevel / requiredQty);
 
@@ -139,6 +144,19 @@ class InventoryService {
       if (component.isRequired && availableForBundle < minAvailable) {
         minAvailable = availableForBundle;
       }
+    }
+
+    // If no component has ever been synced, don't report as out of stock
+    // — inventory data is simply unavailable yet
+    if (!hasAnySyncedInventory) {
+      return {
+        bundleId,
+        availableQuantity: -1,
+        componentInventories,
+        lastCalculatedAt: new Date(),
+        isLowStock: false,
+        isOutOfStock: false,
+      };
     }
 
     const availableQuantity = minAvailable === Infinity ? 0 : minAvailable;

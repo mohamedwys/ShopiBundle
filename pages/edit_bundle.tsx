@@ -25,6 +25,7 @@ import { useBundleAPI } from "@/components/hooks/useBundleAPI";
 import { useRouter } from "next/router";
 import { NextPage } from "next";
 import { useI18n } from "@shopify/react-i18n";
+import { useAppNavigate } from "@/components/providers/AppBridgeProvider";
 import { Bundle, BundleStatus, UpdateBundleInput } from "@/types/v2-api.types";
 
 // Status badge color mapping
@@ -38,6 +39,7 @@ const STATUS_BADGE_TONE: Record<BundleStatus, 'success' | 'info' | 'warning' | '
 
 const EditBundlePage: NextPage = () => {
   const router = useRouter();
+  const navigateToHome = useAppNavigate();
   const id = router.query?.id as string | undefined;
   const [i18n] = useI18n();
 
@@ -96,11 +98,11 @@ const EditBundlePage: NextPage = () => {
       } else {
         setToastMessage("Bundle not found");
         toggleErrorToastActive();
-        setTimeout(() => router.push("/"), 1500);
+        setTimeout(() => navigateToHome("/"), 1500);
       }
     } catch (e) {
       console.error("Error fetching bundle:", e);
-      router.push("/");
+      navigateToHome("/");
     } finally {
       setGettingBundle(false);
     }
@@ -160,7 +162,7 @@ const EditBundlePage: NextPage = () => {
       setBundle(result);
       setToastMessage("Bundle updated successfully");
       toggleSuccessToastActive();
-      setTimeout(() => router.push("/"), 1500);
+      setTimeout(() => navigateToHome("/"), 1500);
     } else {
       setToastMessage(apiError || "Failed to update bundle");
       toggleErrorToastActive();
@@ -279,7 +281,7 @@ const EditBundlePage: NextPage = () => {
           <Card>
             <BlockStack gap="400">
               <Text as="p">Bundle not found</Text>
-              <Button onClick={() => router.push("/")}>Go back</Button>
+              <Button onClick={() => navigateToHome("/")}>Go back</Button>
             </BlockStack>
           </Card>
         </Page>
@@ -299,7 +301,7 @@ const EditBundlePage: NextPage = () => {
           )
         }
         backAction={{
-          onAction: () => router.push("/"),
+          onAction: () => navigateToHome("/"),
         }}
         primaryAction={
           bundle?.status === 'DRAFT' || bundle?.status === 'PAUSED' ? {
@@ -441,7 +443,7 @@ const EditBundlePage: NextPage = () => {
                   >
                     {i18n.translate("buttons.save_bundle")}
                   </Button>
-                  <Button onClick={() => router.push("/")}>
+                  <Button onClick={() => navigateToHome("/")}>
                     {i18n.translate("buttons.cancel")}
                   </Button>
                 </InlineStack>

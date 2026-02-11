@@ -1,6 +1,6 @@
 import isShopAvailable from "@/utils/middleware/isShopAvailable";
 import useFetch from "@/components/hooks/useFetch";
-import { useAppBridge } from "@/components/providers/AppBridgeProvider";
+import { useAppBridge, useAppNavigate } from "@/components/providers/AppBridgeProvider";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -50,6 +50,7 @@ interface BillingUsage {
 
 const SettingsPage = () => {
   const router = useRouter();
+  const navigateToHome = useAppNavigate();
   const { app, isReady } = useAppBridge();
   const fetch = useFetch();
 
@@ -331,7 +332,7 @@ const SettingsPage = () => {
       <Frame>
         <Page
           title="Settings"
-          backAction={{ onAction: () => router.push("/") }}
+          backAction={{ onAction: () => navigateToHome("/") }}
         >
           <Layout>
             <Layout.Section>
@@ -360,7 +361,7 @@ const SettingsPage = () => {
     <Frame>
       <Page
         title="Settings"
-        backAction={{ onAction: () => router.push("/") }}
+        backAction={{ onAction: () => navigateToHome("/") }}
         primaryAction={{
           content: "Save",
           onAction: handleSave,

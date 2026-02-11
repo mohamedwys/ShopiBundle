@@ -19,7 +19,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import React from "react";
 import useFetch from "@/components/hooks/useFetch";
-import { useAppBridge } from "@/components/providers/AppBridgeProvider";
+import { useAppBridge, useAppNavigate } from "@/components/providers/AppBridgeProvider";
 import { useI18n } from "@shopify/react-i18n";
 
 export type getCollectionsData = {
@@ -43,6 +43,7 @@ export type getAutoBundleata = {
 
 const AutoBundlePage = () => {
   const router = useRouter();
+  const navigateToHome = useAppNavigate();
   const fetch = useFetch();
   const { isReady } = useAppBridge();
 
@@ -242,7 +243,7 @@ const AutoBundlePage = () => {
       <Page
         title={i18n.translate("auto_bundle.title")}
         backAction={{
-          onAction: () => router.push("/"),
+          onAction: () => navigateToHome("/"),
         }}
       >
         <Layout>
@@ -352,14 +353,14 @@ const AutoBundlePage = () => {
                     disabled={!bundleActice}
                     onClick={() => {
                       deleteAutoBundle();
-                      router.push("/");
+                      navigateToHome("/");
                     }}
                   >
                     {i18n.translate("buttons.delete")}
                   </Button>
                   <Button
                     onClick={() => {
-                      router.push("/");
+                      navigateToHome("/");
                     }}
                   >
                     {i18n.translate("buttons.cancel")}

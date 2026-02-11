@@ -1,13 +1,15 @@
 import { Layout, Card, Page, BlockStack, Text, Button } from "@shopify/polaris";
 import { useRouter } from "next/router";
+import { useAppNavigate } from "@/components/providers/AppBridgeProvider";
 
 const DebugIndex = () => {
   const router = useRouter();
+  const navigateToHome = useAppNavigate();
   return (
     <Page
       title="Debug Cards"
       subtitle="Interact and explore the current installation"
-      backAction={{ content: "Home", onAction: () => router.push("/") }}
+      backAction={{ content: "Home", onAction: () => navigateToHome("/") }}
     >
       <Layout>
         <Layout.Section>

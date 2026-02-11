@@ -1,5 +1,6 @@
 import isShopAvailable from "@/utils/middleware/isShopAvailable";
 import { useRouter } from "next/router";
+import { useAppNavigate } from "@/components/providers/AppBridgeProvider";
 import {
   Badge,
   Button,
@@ -25,6 +26,7 @@ import { useI18n } from "@shopify/react-i18n";
 
 const AutoBundlesV2Page = () => {
   const router = useRouter();
+  const navigateToHome = useAppNavigate();
   const fetch = useFetch();
   const [i18n] = useI18n();
 
@@ -250,7 +252,7 @@ const AutoBundlesV2Page = () => {
       <Page
         title="Auto Bundle Rules (v2)"
         backAction={{
-          onAction: () => router.push("/"),
+          onAction: () => navigateToHome("/"),
         }}
         primaryAction={{
           content: "Create Rule",

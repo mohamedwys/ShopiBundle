@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { ResourcePicker } from "@shopify/app-bridge/actions";
 import { Product } from "@shopify/app-bridge/actions/ResourcePicker";
 import SelectedProductsTable from "@/components/SelectedProductsTable";
-import { useAppBridge } from "@/components/providers/AppBridgeProvider";
+import { useAppBridge, useAppNavigate } from "@/components/providers/AppBridgeProvider";
 
 import {
   Badge,
@@ -1467,6 +1467,7 @@ const BundleBuilderPage = () => {
   const router = useRouter();
   const [i18n] = useI18n();
   const { app } = useAppBridge();
+  const navigateToHome = useAppNavigate();
   const { createBundle, loading, error, clearError } = useBundleAPI();
 
   // ---- Wizard navigation state ----
@@ -1780,7 +1781,7 @@ const BundleBuilderPage = () => {
     if (result) {
       setSuccessToastActive(true);
       setTimeout(() => {
-        router.push("/");
+        navigateToHome("/");
       }, 1500);
     } else {
       setErrorMessage(error || "Failed to create and publish bundle.");
@@ -1797,7 +1798,7 @@ const BundleBuilderPage = () => {
     selectedProducts,
     createBundle,
     error,
-    router,
+    navigateToHome,
     minProducts,
     maxProducts,
     allowGiftMessage,
@@ -1838,7 +1839,7 @@ const BundleBuilderPage = () => {
     if (result) {
       setSuccessToastActive(true);
       setTimeout(() => {
-        router.push("/");
+        navigateToHome("/");
       }, 1500);
     } else {
       setErrorMessage(error || "Failed to save draft.");
@@ -1852,7 +1853,7 @@ const BundleBuilderPage = () => {
     selectedProducts,
     createBundle,
     error,
-    router,
+    navigateToHome,
   ]);
 
   // ---- Render current step ----
@@ -1993,7 +1994,7 @@ const BundleBuilderPage = () => {
         backAction={{
           onAction: () => {
             if (isFirstStep) {
-              router.push("/");
+              navigateToHome("/");
             } else {
               handleBack();
             }

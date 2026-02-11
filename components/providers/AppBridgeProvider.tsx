@@ -1,9 +1,9 @@
 "use client";
 
-import { ReactNode, useEffect, useState, createContext, useContext } from "react";
+import { ReactNode, useEffect, useState, useCallback, createContext, useContext } from "react";
 import { useRouter } from "next/router";
 import createApp from "@shopify/app-bridge";
-import { NavigationMenu, AppLink } from "@shopify/app-bridge/actions";
+import { NavigationMenu, AppLink, Redirect } from "@shopify/app-bridge/actions";
 
 interface AppBridgeProviderProps {
   children: ReactNode;
@@ -22,6 +22,21 @@ const AppBridgeContext = createContext<AppBridgeContextValue>({
 });
 
 export const useAppBridge = () => useContext(AppBridgeContext);
+
+/**
+ * Hook for safe in-app navigation that preserves Shopify embedded app context.
+ * Use this instead of router.push() to avoid losing the host parameter.
+ */
+export function useAppNavigate() {
+  const { app } = useAppBridge();
+
+  return useCallback((path: string) => {
+    if (app) {
+      const redirect = Redirect.create(app);
+      redirect.dispatch(Redirect.Action.APP, path);
+    }
+  }, [app]);
+}
 
 export default function AppBridgeProvider({ children }: AppBridgeProviderProps) {
   const router = useRouter();

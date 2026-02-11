@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { ResourcePicker } from "@shopify/app-bridge/actions";
 import { Product } from "@shopify/app-bridge/actions/ResourcePicker";
 import SelectedProductsTable from "@/components/SelectedProductsTable";
-import { useAppBridge } from "@/components/providers/AppBridgeProvider";
+import { useAppBridge, useAppNavigate } from "@/components/providers/AppBridgeProvider";
 
 import {
   Banner,
@@ -30,6 +30,7 @@ const CreateBundlePage = () => {
   const router = useRouter();
   const [i18n] = useI18n();
   const { app } = useAppBridge();
+  const navigateToHome = useAppNavigate();
 
   // Use V2 Bundle API hook
   const { createBundle, loading, error, clearError } = useBundleAPI();
@@ -152,7 +153,7 @@ const CreateBundlePage = () => {
 
       // Redirect to home after a short delay
       setTimeout(() => {
-        router.push("/");
+        navigateToHome("/");
       }, 1500);
     } else {
       // Error - show message
@@ -186,7 +187,7 @@ const CreateBundlePage = () => {
       <Page
         title="Create Bundle"
         backAction={{
-          onAction: () => router.push("/"),
+          onAction: () => navigateToHome("/"),
         }}
       >
         <Layout>
@@ -298,7 +299,7 @@ const CreateBundlePage = () => {
                   </Button>
                   <Button
                     size="large"
-                    onClick={() => router.push("/")}
+                    onClick={() => navigateToHome("/")}
                   >
                     Cancel
                   </Button>

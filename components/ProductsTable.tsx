@@ -35,6 +35,11 @@ function InventoryBadge({ inventory }: { inventory?: BundleInventory }) {
     return <Badge>-</Badge>;
   }
 
+  // available === -1 means inventory has never been synced from Shopify
+  if (inventory.available === -1 || inventory.available === undefined) {
+    return <Badge tone="info">Awaiting sync</Badge>;
+  }
+
   if (inventory.isOutOfStock) {
     return <Badge tone="critical">Out of stock</Badge>;
   }

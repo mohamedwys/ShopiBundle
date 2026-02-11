@@ -10,6 +10,7 @@
 import isShopAvailable from "@/utils/middleware/isShopAvailable";
 import { useRouter } from "next/router";
 import useFetch from "@/components/hooks/useFetch";
+import { useAppNavigate } from "@/components/providers/AppBridgeProvider";
 
 import {
   Badge,
@@ -146,6 +147,7 @@ const SORT_FIELD_MAP: Record<number, keyof BundlePerformance> = {
 
 const AnalyticsPage: NextPage = () => {
   const router = useRouter();
+  const navigateToHome = useAppNavigate();
   const fetch = useFetch();
 
   // Data
@@ -557,7 +559,7 @@ const AnalyticsPage: NextPage = () => {
     <Page
       title="Analytics"
       subtitle="Monitor your bundle performance and revenue"
-      backAction={{ onAction: () => router.push("/") }}
+      backAction={{ onAction: () => navigateToHome("/") }}
       secondaryActions={[
         {
           content: "Refresh",
