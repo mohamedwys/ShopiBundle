@@ -418,5 +418,7 @@ function buildDiscountValue(definition: BundleDefinition): Discount["value"] | n
   return null;
 }
 
-// Default export for Shopify Functions runtime
-export default run;
+// Named export for Shopify Functions runtime
+export { run };
+// Note: Avoiding `export default` due to bundler issues with reserved keyword
+export const defaultFn = run;

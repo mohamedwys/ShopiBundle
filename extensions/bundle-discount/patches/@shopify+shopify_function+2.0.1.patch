@@ -1,10 +1,33 @@
 diff --git a/node_modules/@shopify/shopify_function/index.ts b/node_modules/@shopify/shopify_function/index.ts
-index 523d317..a221a7b 100644
+index 523d317..c17fd79 100644
 --- a/node_modules/@shopify/shopify_function/index.ts
 +++ b/node_modules/@shopify/shopify_function/index.ts
-@@ -2,4 +2,4 @@
+@@ -1,5 +1,6 @@
+ // This package name will be aliased to the file provided by the user.
  import * as userFunction from "user-function";
- import run from "./run";
+-import run from "./run";
++import runFunction from "./run";
  
 -run(userFunction?.default)
-+run(userFunction?.["default"] || userFunction)
++const fn = userFunction as any;
++runFunction(fn.run || fn.defaultFn || fn)
+diff --git a/node_modules/@shopify/shopify_function/run.ts b/node_modules/@shopify/shopify_function/run.ts
+index 1bc3c50..f698856 100644
+--- a/node_modules/@shopify/shopify_function/run.ts
++++ b/node_modules/@shopify/shopify_function/run.ts
+@@ -11,7 +11,7 @@ declare global {
+   const ShopifyFunction: ShopifyFunction;
+ }
+ 
+-export default function <I extends {}, O extends {}>(
++function runFunction <I extends {}, O extends {}>(
+   userfunction: UserFunction<I, O>
+ ) {
+   try {
+@@ -26,3 +26,6 @@ export default function <I extends {}, O extends {}>(
+   const output_obj = userfunction(input_obj);
+   ShopifyFunction.writeOutput(output_obj);
+ }
++
++// Use module.exports to avoid issues with reserved keyword 'default'
++export = runFunction;
