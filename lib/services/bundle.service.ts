@@ -16,6 +16,8 @@ import {
   ShopifyIntegrationService,
   BundleShopifyData,
 } from './shopify-integration.service';
+import { getPublishValidationService } from './publish-validation.service';
+import { createShopifyClient } from '@/lib/shopify/client';
 
 // Types
 export interface CreateBundleInput {
@@ -663,6 +665,24 @@ export class BundleService {
 
     if (bundle.components.length < 2) {
       throw new Error('Bundle must have at least 2 components to publish');
+    }
+
+    // ============================================
+    // PRE-PUBLISH VALIDATION
+    // ============================================
+    // Validate that Shopify is ready for publishing:
+    // 1. Metaobject definition exists with all required fields (fixes "bundle_type does not exist")
+    // 2. Shopify Function "bundle-discount" is deployed (fixes "Function bundle-discount not found")
+    try {
+      const client = createShopifyClient(shop);
+      const validationService = getPublishValidationService();
+
+      log.info('Running pre-publish validation');
+      await validationService.validateOrThrow(client, shop);
+      log.info('Pre-publish validation passed');
+    } catch (validationError: any) {
+      log.error('Pre-publish validation failed', { error: validationError.message });
+      throw new Error(`Cannot publish bundle: ${validationError.message}`);
     }
 
     // Get the discount percentage from pricing rules
