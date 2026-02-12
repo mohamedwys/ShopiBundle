@@ -5,12 +5,10 @@ name = "bundle-discount"
 handle = "bundle-discount"
 type = "function"
 description = "Validates complete bundle presence in cart before applying discount"
-language = "javascript"
 
 [extensions.build]
-command = "npm run build"
-path = "dist/function.js"
-watch = ["src/**/*.ts"]
+command = ""
+path = "src/index.ts"
 
 [[extensions.targeting]]
 target = "purchase.product-discount.run"
