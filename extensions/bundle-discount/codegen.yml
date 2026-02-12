@@ -1,0 +1,5 @@
+# Minimal config - types are manually defined in src/types.ts
+# This prevents Shopify CLI from using package.json as config
+
+overwrite: true
+generates: {}
