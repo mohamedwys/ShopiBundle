@@ -10,7 +10,7 @@ type = "function"
 description = "Validates complete bundle presence in cart before applying discount"
 
 [extensions.build]
-command = "npx tsc && npx esbuild dist/index.js --bundle --outfile=dist/function.js --platform=node --format=esm --target=esnext"
+command = "npm run build"
 path = "dist/function.js"
 watch = ["src/**/*.ts"]
 
