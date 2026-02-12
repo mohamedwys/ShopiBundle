@@ -1,8 +1,0 @@
-schema: node_modules/@shopify/shopify_function/schema.graphql
-documents:
-  - ./src/**/*.graphql
-generates:
-  ./src/generated/api.ts:
-    plugins:
-      - typescript
-      - typescript-operations

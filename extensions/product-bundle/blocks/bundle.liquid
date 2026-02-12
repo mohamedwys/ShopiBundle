@@ -51,12 +51,14 @@
   ></div>
 {% endif %}
 
+{% comment %} Load widget script from external URL (bypasses 10KB limit) {% endcomment %}
+<script src="{{ block.settings.widget_url | default: 'https://shopi-bundle.vercel.app/widget/bundle-widget.js' }}" defer></script>
+
 {% schema %}
 {
   "name": "Product Bundle",
   "target": "section",
   "stylesheet": "style.css",
-  "javascript": "bundle-widget.js",
   "templates": ["index", "product", "collection", "cart"],
   "settings": [
     {
@@ -71,6 +73,13 @@
       "label": "Auto-inject on product pages",
       "info": "Automatically show bundle offers when customer views a bundled product. Enable this for most stores.",
       "default": true
+    },
+    {
+      "type": "url",
+      "id": "widget_url",
+      "label": "Widget Script URL",
+      "info": "URL to the bundle widget JavaScript. Leave blank to use default hosted version.",
+      "default": "https://shopi-bundle.vercel.app/widget/bundle-widget.js"
     }
   ]
 }
