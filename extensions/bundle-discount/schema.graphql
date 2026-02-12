@@ -1,0 +1,40 @@
+# Minimal schema for GraphQL Codegen
+# Actual types are manually defined in src/types.ts
+
+type Query {
+  cart: Cart
+  discountNode: DiscountNode
+}
+
+type Cart {
+  lines: [CartLine!]!
+}
+
+type CartLine {
+  id: ID!
+  quantity: Int!
+  merchandise: ProductVariant!
+  attribute(key: String!): CartAttribute
+  tierAttribute: CartAttribute
+}
+
+type ProductVariant {
+  id: ID!
+  product: Product!
+}
+
+type Product {
+  id: ID!
+}
+
+type CartAttribute {
+  value: String!
+}
+
+type DiscountNode {
+  metafield(namespace: String!, key: String!): Metafield
+}
+
+type Metafield {
+  value: String!
+}
