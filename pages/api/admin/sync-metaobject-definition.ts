@@ -230,8 +230,8 @@ async function handler(ctx: ApiContext): Promise<void> {
     } else {
       // 2b. Definition exists - check for missing fields
       const definitionId = bundleDef.node.id;
-      const existingKeys = new Set(bundleDef.node.fieldDefinitions.map((f: any) => f.key));
-      const existingFieldsList = Array.from(existingKeys);
+      const existingKeys = new Set<string>(bundleDef.node.fieldDefinitions.map((f: any) => f.key as string));
+      const existingFieldsList: string[] = Array.from(existingKeys);
 
       const missingFields = REQUIRED_FIELDS.filter((f) => !existingKeys.has(f.key));
 
