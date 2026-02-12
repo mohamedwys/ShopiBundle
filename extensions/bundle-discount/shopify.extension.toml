@@ -10,13 +10,13 @@ type = "function"
 description = "Validates complete bundle presence in cart before applying discount"
 
 [extensions.build]
-command = "npx tsc src/index.ts --outDir dist --module CommonJS --target ES2020 --declaration false"
-path = "dist/index.js"
+command = ""
+path = "src/index.ts"
 
 [[extensions.targeting]]
 target = "purchase.product-discount.run"
 input_query = "src/run.graphql"
-export = "defaultFn"
+export = "default-fn"
 
 [extensions.ui]
 enable_create = false
