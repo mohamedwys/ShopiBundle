@@ -3,6 +3,9 @@ api_version = "2026-01"
 [[extensions]]
 name = "bundle-discount"
 handle = "bundle-discount"
+
+uid = "208e9edf-8b9b-6b74-3f3a-539fdede2328f859a084"
+
 type = "function"
 description = "Validates complete bundle presence in cart before applying discount"
 
