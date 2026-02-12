@@ -8,6 +8,7 @@ uid = "208e9edf-8b9b-6b74-3f3a-539fdede2328f859a084"
 
 type = "function"
 description = "Validates complete bundle presence in cart before applying discount"
+language = "javascript"
 
 [extensions.build]
 command = "npm run build"
