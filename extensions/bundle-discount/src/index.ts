@@ -35,7 +35,7 @@ const EMPTY_RESULT: FunctionRunResult = {
  * Main entry point for the Shopify Function.
  * Called by Shopify at checkout time for every cart evaluation.
  */
-export function run(input: RunInput): FunctionRunResult {
+function run(input: RunInput): FunctionRunResult {
   const config = parseConfig(input);
   if (!config) {
     return EMPTY_RESULT;
