@@ -10,6 +10,12 @@
     "@shopify/shopify_function": "~2.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "@graphql-codegen/cli": "^5.0.0",
+    "@graphql-codegen/typescript": "^4.0.1"
+  },
+  "graphql": {
+    "schema": "node_modules/@shopify/shopify_function/schema.graphql",
+    "documents": "./src/**/*.graphql"
   }
 }
