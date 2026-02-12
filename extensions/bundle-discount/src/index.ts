@@ -13,7 +13,6 @@
  * - Fails silently (returns empty discounts) on invalid config
  */
 
-import { shopifyFunction } from "@shopify/shopify_function";
 import type {
   RunInput,
   FunctionRunResult,
@@ -36,7 +35,7 @@ const EMPTY_RESULT: FunctionRunResult = {
  * Main entry point for the Shopify Function.
  * Called by Shopify at checkout time for every cart evaluation.
  */
-function run(input: RunInput): FunctionRunResult {
+export function run(input: RunInput): FunctionRunResult {
   const config = parseConfig(input);
   if (!config) {
     return EMPTY_RESULT;
@@ -419,5 +418,5 @@ function buildDiscountValue(definition: BundleDefinition): Discount["value"] | n
   return null;
 }
 
-// Export function using Shopify Functions wrapper (required for CLI v3)
-export default shopifyFunction({ run });
+// Default export for Shopify Functions runtime (named export above for tests)
+export default run;
