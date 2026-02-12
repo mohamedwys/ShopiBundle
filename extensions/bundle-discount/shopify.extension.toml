@@ -11,7 +11,7 @@ command = "npx tsc && npx esbuild dist/index.js --bundle --outfile=dist/function
 path = "dist/function.js"
 watch = ["src/**/*.ts"]
 
-[extensions.targeting]
+[[extensions.targeting]]
 target = "purchase.product-discount.run"
 input_query = "src/run.graphql"
 export = "run"
