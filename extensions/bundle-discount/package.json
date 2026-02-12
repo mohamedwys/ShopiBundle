@@ -3,22 +3,29 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "shopify-function build"
-  },
-  "dependencies": {
-    "@shopify/shopify_function": "~2.0.0"
+    "build": "shopify-function build",
+    "postinstall": "patch-package"
   },
   "devDependencies": {
+    "patch-package": "^8.0.1",
     "typescript": "^5.6.2"
   },
   "codegen": {
     "overwrite": true,
     "schema": "./schema.graphql",
-    "documents": ["./src/**/*.graphql"],
+    "documents": [
+      "./src/**/*.graphql"
+    ],
     "generates": {
       "./src/generated/api.ts": {
-        "plugins": ["typescript", "typescript-operations"]
+        "plugins": [
+          "typescript",
+          "typescript-operations"
+        ]
       }
     }
+  },
+  "dependencies": {
+    "@shopify/shopify_function": "^2.0.1"
   }
 }

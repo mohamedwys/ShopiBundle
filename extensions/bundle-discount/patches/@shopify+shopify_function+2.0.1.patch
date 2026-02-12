@@ -1,0 +1,10 @@
+diff --git a/node_modules/@shopify/shopify_function/index.ts b/node_modules/@shopify/shopify_function/index.ts
+index 523d317..a221a7b 100644
+--- a/node_modules/@shopify/shopify_function/index.ts
++++ b/node_modules/@shopify/shopify_function/index.ts
+@@ -2,4 +2,4 @@
+ import * as userFunction from "user-function";
+ import run from "./run";
+ 
+-run(userFunction?.default)
++run(userFunction?.["default"] || userFunction)
