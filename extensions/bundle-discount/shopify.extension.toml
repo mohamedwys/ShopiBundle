@@ -17,7 +17,7 @@ watch = ["src/**/*.ts"]
 [[extensions.targeting]]
 target = "purchase.product-discount.run"
 input_query = "src/run.graphql"
-export = "run"
+export = "default"
 
 [extensions.ui]
 enable_create = false
